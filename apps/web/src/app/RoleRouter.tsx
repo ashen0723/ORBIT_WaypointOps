@@ -12,10 +12,11 @@ interface RoleRouterProps {
   modules: RoleModules;
   /** Rendered when signed out (owns its own router for /login). */
   login: React.ReactNode;
+  landing: React.ReactNode;
 }
 
 /** Mounts exactly one role module under its base path, or the login tree when signed out. */
-export function RoleRouter({ role, userId, modules, login }: RoleRouterProps) {
+export function RoleRouter({ role, userId, modules, login, landing }: RoleRouterProps) {
   // Back/forward can land outside the role's base path (e.g. another role's URL left in this tab's history).
   // The module's router may already have captured that foreign URL — its popstate listener can run before
   // ours — so after correcting the URL we remount the module (epoch in its key) to make it re-read it.
@@ -34,6 +35,7 @@ export function RoleRouter({ role, userId, modules, login }: RoleRouterProps) {
   if (decision.redirectTo) window.history.replaceState(null, '', decision.redirectTo);
 
   if (decision.module === 'login') return <>{login}</>;
+  if (decision.module === 'landing') return <>{landing}</>;
 
   const Module = modules[decision.module];
   return <Module key={`${userId ?? ''}:${epoch}`} basename={ROLE_BASE_PATH[decision.module]} />;
