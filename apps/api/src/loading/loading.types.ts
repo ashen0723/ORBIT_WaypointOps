@@ -158,3 +158,19 @@ export interface AcknowledgeLoadingIssueResult {
   acknowledgedAt: string;
   alreadyAcknowledged: boolean;
 }
+
+export interface ReadyTripResult {
+  tripId: string;
+  tripStatus: 'READY';
+  loadingRecordId: string;
+  loadingStatus: 'COMPLETED';
+  completedAt: string;
+  alreadyReady: boolean;
+  shortfalls: Array<{
+    issueId: string;
+    orderLineId: string;
+    expectedQty: number;
+    loadedQty: number;
+    shortfallQty: number;
+  }>;
+}

@@ -14,6 +14,7 @@ import type {
   LoadingStartResult,
   LoaderTripDetail,
   LoaderTripSummary,
+  ReadyTripResult,
 } from './loading.types';
 
 /** Loading records, actual quantities, shortfalls, ready state. */
@@ -553,6 +554,199 @@ export class LoadingService {
       };
     });
   }
+
+  async markTripReady(
+    tripId: string,
+    loader: { id: string; depotId: string },
+  ): Promise<ReadyTripResult> {
+    const trip = await this.prisma.trip.findFirst({
+      where: { id: tripId, depotId: loader.depotId },
+      include: {
+        loadingRecord: {
+          include: { issues: true },
+        },
+        stops: {
+          include: {
+            order: {
+              include: { lines: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!trip) {
+      throw new NotFoundException('Trip not found for this Loader depot.');
+    }
+
+    const loadingRecord = trip.loadingRecord;
+
+    if (
+      trip.status === 'READY' &&
+      loadingRecord?.status === 'COMPLETED' &&
+      loadingRecord.completedAt
+    ) {
+      return readyResult(trip, true);
+    }
+
+    if (trip.status !== 'LOADING' || loadingRecord?.status !== 'IN_PROGRESS') {
+      throw new ConflictException({
+        code: 'LOADING_NOT_READY',
+        message: 'The trip must have an active loading record before it can be marked ready.',
+        blockers: [{ type: 'INVALID_LOADING_STATE' }],
+      });
+    }
+
+    const blockers: Array<Record<string, unknown>> = [];
+
+    for (const issue of loadingRecord.issues) {
+      if (issue.status === 'OPEN') {
+        blockers.push({
+          type: 'OPEN_ISSUE',
+          issueId: issue.id,
+          orderLineId: issue.orderLineId,
+        });
+      } else if (!issue.acknowledgedAt) {
+        blockers.push({
+          type: 'DECISION_NOT_ACKNOWLEDGED',
+          issueId: issue.id,
+          orderLineId: issue.orderLineId,
+        });
+      }
+    }
+
+    for (const stop of trip.stops) {
+      for (const line of stop.order.lines) {
+        if (line.loadedQty === null) {
+          blockers.push({
+            type: 'QUANTITY_NOT_VERIFIED',
+            orderLineId: line.id,
+            expectedQty: line.requestedQty,
+          });
+          continue;
+        }
+
+        if (line.loadedQty > line.requestedQty) {
+          blockers.push({
+            type: 'QUANTITY_EXCEEDS_EXPECTED',
+            orderLineId: line.id,
+            expectedQty: line.requestedQty,
+            loadedQty: line.loadedQty,
+          });
+          continue;
+        }
+
+        if (line.loadedQty < line.requestedQty) {
+          const approvedIssue = loadingRecord.issues.find(
+            (issue) =>
+              issue.orderLineId === line.id &&
+              issue.status !== 'OPEN' &&
+              Boolean(issue.acknowledgedAt),
+          );
+
+          if (!approvedIssue) {
+            blockers.push({
+              type: 'SHORTFALL_NOT_APPROVED',
+              orderLineId: line.id,
+              expectedQty: line.requestedQty,
+              loadedQty: line.loadedQty,
+            });
+          }
+        }
+      }
+    }
+
+    if (blockers.length > 0) {
+      throw new ConflictException({
+        code: 'LOADING_NOT_READY',
+        message: 'Resolve all loading checks before marking this trip ready.',
+        blockers,
+      });
+    }
+
+    const completedAt = new Date();
+    const orderIds = trip.stops.map((stop) => stop.orderId);
+
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.loadingRecord.update({
+        where: { id: loadingRecord.id },
+        data: { status: 'COMPLETED', completedAt },
+      });
+
+      await transaction.trip.update({
+        where: { id: tripId },
+        data: { status: 'READY' },
+      });
+
+      if (orderIds.length > 0) {
+        await transaction.order.updateMany({
+          where: { id: { in: orderIds }, status: 'LOADING' },
+          data: { status: 'READY' },
+        });
+      }
+
+      await transaction.auditEvent.create({
+        data: {
+          actorId: loader.id,
+          entityType: 'Trip',
+          entityId: tripId,
+          action: 'TRIP_MARKED_READY',
+          payload: {
+            loadingRecordId: loadingRecord.id,
+            shortfallIssueIds: loadingRecord.issues
+              .filter((issue) => issue.status === 'SHIP_SHORT')
+              .map((issue) => issue.id),
+          },
+        },
+      });
+    });
+
+    loadingRecord.status = 'COMPLETED';
+    loadingRecord.completedAt = completedAt;
+    trip.status = 'READY';
+
+    return readyResult(trip, false);
+  }
+}
+
+function readyResult(
+  trip: {
+    id: string;
+    status: string;
+    loadingRecord: {
+      id: string;
+      status: string;
+      completedAt: Date | null;
+      issues: Array<{
+        id: string;
+        orderLineId: string;
+        status: string;
+        expectedQty: number;
+        availableQty: number;
+      }>;
+    } | null;
+  },
+  alreadyReady: boolean,
+): ReadyTripResult {
+  const loadingRecord = trip.loadingRecord!;
+
+  return {
+    tripId: trip.id,
+    tripStatus: 'READY',
+    loadingRecordId: loadingRecord.id,
+    loadingStatus: 'COMPLETED',
+    completedAt: loadingRecord.completedAt!.toISOString(),
+    alreadyReady,
+    shortfalls: loadingRecord.issues
+      .filter((issue) => issue.status === 'SHIP_SHORT')
+      .map((issue) => ({
+        issueId: issue.id,
+        orderLineId: issue.orderLineId,
+        expectedQty: issue.expectedQty,
+        loadedQty: issue.availableQty,
+        shortfallQty: issue.expectedQty - issue.availableQty,
+      })),
+  };
 }
 
 function queueStatus(

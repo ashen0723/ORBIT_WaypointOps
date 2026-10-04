@@ -482,4 +482,118 @@ describe('LoadingService', () => {
       id: 'USR-LDR', depotId: 'DEP-PLG',
     })).rejects.toMatchObject({ status: 409 });
   });
+
+  it('marks a fully checked trip ready and retains approved shortfall flags', async () => {
+    const findFirst = jest.fn().mockResolvedValue({
+      id: 'TRIP-1', status: 'LOADING',
+      loadingRecord: {
+        id: 'LOAD-1', status: 'IN_PROGRESS', completedAt: null,
+        issues: [{
+          id: 'ISSUE-1', orderLineId: 'LINE-1', status: 'SHIP_SHORT',
+          expectedQty: 20, availableQty: 16,
+          acknowledgedAt: new Date('2026-10-05T05:00:00.000Z'),
+        }],
+      },
+      stops: [{
+        orderId: 'ORD-1',
+        order: { lines: [{ id: 'LINE-1', requestedQty: 20, loadedQty: 16 }] },
+      }],
+    });
+    const updateRecord = jest.fn().mockResolvedValue({});
+    const updateTrip = jest.fn().mockResolvedValue({});
+    const updateOrders = jest.fn().mockResolvedValue({ count: 1 });
+    const createAudit = jest.fn().mockResolvedValue({});
+    const transaction = jest.fn(async (callback) => callback({
+      loadingRecord: { update: updateRecord },
+      trip: { update: updateTrip },
+      order: { updateMany: updateOrders },
+      auditEvent: { create: createAudit },
+    }));
+    const readinessService = new LoadingService({
+      trip: { findFirst }, $transaction: transaction,
+    } as unknown as PrismaService);
+
+    await expect(readinessService.markTripReady('TRIP-1', {
+      id: 'USR-LDR', depotId: 'DEP-PLG',
+    })).resolves.toMatchObject({
+      tripId: 'TRIP-1', tripStatus: 'READY', loadingStatus: 'COMPLETED',
+      alreadyReady: false,
+      shortfalls: [{
+        issueId: 'ISSUE-1', orderLineId: 'LINE-1',
+        expectedQty: 20, loadedQty: 16, shortfallQty: 4,
+      }],
+    });
+
+    expect(updateRecord).toHaveBeenCalledWith({
+      where: { id: 'LOAD-1' },
+      data: { status: 'COMPLETED', completedAt: expect.any(Date) },
+    });
+    expect(updateTrip).toHaveBeenCalledWith({
+      where: { id: 'TRIP-1' }, data: { status: 'READY' },
+    });
+    expect(updateOrders).toHaveBeenCalledWith({
+      where: { id: { in: ['ORD-1'] }, status: 'LOADING' },
+      data: { status: 'READY' },
+    });
+  });
+
+  it('blocks readiness when quantities are unchecked or an issue is open', async () => {
+    const findFirst = jest.fn().mockResolvedValue({
+      id: 'TRIP-1', status: 'LOADING',
+      loadingRecord: {
+        id: 'LOAD-1', status: 'IN_PROGRESS', completedAt: null,
+        issues: [{
+          id: 'ISSUE-1', orderLineId: 'LINE-1', status: 'OPEN',
+          expectedQty: 20, availableQty: 16, acknowledgedAt: null,
+        }],
+      },
+      stops: [{
+        orderId: 'ORD-1',
+        order: { lines: [
+          { id: 'LINE-1', requestedQty: 20, loadedQty: 16 },
+          { id: 'LINE-2', requestedQty: 4, loadedQty: null },
+        ] },
+      }],
+    });
+    const transaction = jest.fn();
+    const readinessService = new LoadingService({
+      trip: { findFirst }, $transaction: transaction,
+    } as unknown as PrismaService);
+
+    await expect(readinessService.markTripReady('TRIP-1', {
+      id: 'USR-LDR', depotId: 'DEP-PLG',
+    })).rejects.toMatchObject({
+      status: 409,
+      response: expect.objectContaining({
+        code: 'LOADING_NOT_READY',
+        blockers: expect.arrayContaining([
+          expect.objectContaining({ type: 'OPEN_ISSUE', issueId: 'ISSUE-1' }),
+          expect.objectContaining({ type: 'QUANTITY_NOT_VERIFIED', orderLineId: 'LINE-2' }),
+        ]),
+      }),
+    });
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('returns a completed ready trip without writing again', async () => {
+    const completedAt = new Date('2026-10-05T05:15:00.000Z');
+    const findFirst = jest.fn().mockResolvedValue({
+      id: 'TRIP-1', status: 'READY',
+      loadingRecord: {
+        id: 'LOAD-1', status: 'COMPLETED', completedAt, issues: [],
+      },
+      stops: [],
+    });
+    const transaction = jest.fn();
+    const readinessService = new LoadingService({
+      trip: { findFirst }, $transaction: transaction,
+    } as unknown as PrismaService);
+
+    await expect(readinessService.markTripReady('TRIP-1', {
+      id: 'USR-LDR', depotId: 'DEP-PLG',
+    })).resolves.toMatchObject({
+      tripStatus: 'READY', completedAt: completedAt.toISOString(), alreadyReady: true,
+    });
+    expect(transaction).not.toHaveBeenCalled();
+  });
 });
