@@ -1,0 +1,63 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { PlusIcon } from 'lucide-react';
+import { useOrders } from '../contexts/OrdersContext';
+import { PageContainer } from '../components/ui/PageContainer';
+import { PageHeader } from '../components/ui/PageHeader';
+import { buttonStyles } from '../components/ui/Button';
+import { StatCard } from '../components/orders/StatCard';
+import { OrdersTable } from '../components/orders/OrdersTable';
+import { OUTLET_NAME, TODAY, WEEK_START } from '../data/schedule';
+import { formatDateLong } from '../utils/format';
+export function Home() {
+  const {
+    orders
+  } = useOrders();
+  const current = orders.filter((o) => o.requestedDate >= TODAY || o.status === 'delivered' || o.status === 'deferred');
+  const stats = [{
+    label: 'Orders Today',
+    value: orders.filter((o) => o.requestedDate === TODAY).length,
+    tone: 'forest' as const
+  }, {
+    label: 'Pending Confirmation',
+    value: orders.filter((o) => o.status === 'placed').length,
+    tone: 'surface' as const
+  }, {
+    label: 'Deferred',
+    value: orders.filter((o) => o.status === 'deferred').length,
+    tone: 'surface' as const
+  }, {
+    label: 'Delivered This Week',
+    value: orders.filter((o) => (o.status === 'delivered' || o.status === 'receipt_confirmed') && o.requestedDate >= WEEK_START).length,
+    tone: 'surface' as const
+  }];
+  return <PageContainer className="pb-32 md:pb-8">
+      <PageHeader title="My Orders" subtitle={`${OUTLET_NAME} · ${formatDateLong(TODAY)}`} actions={<Link to="/place-order" className={`${buttonStyles('primary', 'lg')} hidden md:inline-flex`}>
+            <PlusIcon aria-hidden="true" className="h-5 w-5" />
+            Place New Order
+          </Link>} />
+
+      <section aria-label="Order summary" className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4 lg:gap-6">
+        {stats.map((s) => <StatCard key={s.label} {...s} />)}
+      </section>
+
+      <section aria-labelledby="orders-heading" className="mt-8">
+        <div className="mb-4 flex items-baseline justify-between gap-4">
+          <h2 id="orders-heading" className="text-lg font-semibold text-ink">
+            Today & upcoming
+          </h2>
+          <Link to="/history" className="rounded text-sm font-semibold text-brand hover:text-forest focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">
+            Order history
+          </Link>
+        </div>
+        <OrdersTable orders={current} label="Today's and upcoming orders" />
+      </section>
+
+      <div className="fixed inset-x-0 bottom-16 z-20 border-t border-line bg-surface px-4 py-3 md:hidden">
+        <Link to="/place-order" className={buttonStyles('primary', 'lg', true)}>
+          <PlusIcon aria-hidden="true" className="h-5 w-5" />
+          Place New Order
+        </Link>
+      </div>
+    </PageContainer>;
+}

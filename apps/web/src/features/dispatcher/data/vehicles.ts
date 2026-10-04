@@ -1,0 +1,18 @@
+import type { Vehicle } from '../types/dispatch';
+
+/** Demo fleet (official dataset not supplied). Vehicle IDs preserved from the original prototype. */
+export const vehicles: Vehicle[] = [
+{ id: 'TRK-021', type: 'Refrigerated Truck', depotId: 'DEP-PLG', capacityKg: 1000, capacityM3: 18, refrigeration: 'chilled', isVan: false, defaultDriverId: 'DRV-01', fuelLPer100Km: 16, weeklyFuelBudgetL: 250, maxDailyMin: 600, unavailable: [] },
+{ id: 'TRK-018', type: 'Refrigerated Truck', depotId: 'DEP-PLG', capacityKg: 1200, capacityM3: 20, refrigeration: 'chilled', isVan: false, defaultDriverId: 'DRV-02', fuelLPer100Km: 17, weeklyFuelBudgetL: 260, maxDailyMin: 600, unavailable: [] },
+{ id: 'TRK-015', type: 'Freezer Truck', depotId: 'DEP-PLG', capacityKg: 1500, capacityM3: 22, refrigeration: 'frozen', isVan: false, defaultDriverId: 'DRV-03', fuelLPer100Km: 19, weeklyFuelBudgetL: 240, maxDailyMin: 600, unavailable: [] },
+{ id: 'TRK-033', type: 'Freezer Truck', depotId: 'DEP-PLG', capacityKg: 1400, capacityM3: 20, refrigeration: 'frozen', isVan: false, defaultDriverId: 'DRV-04', fuelLPer100Km: 19, weeklyFuelBudgetL: 220, maxDailyMin: 540, unavailable: [] },
+{ id: 'TRK-030', type: 'Ambient Truck', depotId: 'DEP-PLG', capacityKg: 2000, capacityM3: 26, refrigeration: 'ambient', isVan: false, defaultDriverId: 'DRV-05', fuelLPer100Km: 15, weeklyFuelBudgetL: 280, maxDailyMin: 660, unavailable: [] },
+{ id: 'TRK-027', type: 'Refrigerated Truck', depotId: 'DEP-PLG', capacityKg: 1100, capacityM3: 18, refrigeration: 'chilled', isVan: false, defaultDriverId: 'DRV-06', fuelLPer100Km: 16, weeklyFuelBudgetL: 240, maxDailyMin: 360, unavailable: [] },
+{ id: 'TRK-036', type: 'Refrigerated Truck', depotId: 'DEP-PLG', capacityKg: 1000, capacityM3: 17, refrigeration: 'chilled', isVan: false, defaultDriverId: 'DRV-07', fuelLPer100Km: 16, weeklyFuelBudgetL: 60, maxDailyMin: 600, unavailable: [] },
+{ id: 'TRK-009', type: 'Refrigerated Truck', depotId: 'DEP-PLG', capacityKg: 900, capacityM3: 16, refrigeration: 'chilled', isVan: false, defaultDriverId: 'DRV-08', fuelLPer100Km: 15, weeklyFuelBudgetL: 200, maxDailyMin: 480, unavailable: [] },
+{ id: 'TRK-024', type: 'Ambient Truck', depotId: 'DEP-PLG', capacityKg: 1800, capacityM3: 24, refrigeration: 'ambient', isVan: false, defaultDriverId: null, fuelLPer100Km: 15, weeklyFuelBudgetL: 260, maxDailyMin: 600, unavailable: [] },
+{ id: 'VAN-012', type: 'Chilled Van', depotId: 'DEP-PLG', capacityKg: 600, capacityM3: 8, refrigeration: 'chilled', isVan: true, defaultDriverId: 'DRV-09', fuelLPer100Km: 11, weeklyFuelBudgetL: 150, maxDailyMin: 600, unavailable: [] },
+{ id: 'VAN-007', type: 'Van', depotId: 'DEP-PLG', capacityKg: 500, capacityM3: 7, refrigeration: 'ambient', isVan: true, defaultDriverId: 'DRV-10', fuelLPer100Km: 10, weeklyFuelBudgetL: 150, maxDailyMin: 600, unavailable: [] },
+{ id: 'TRK-041', type: 'Refrigerated Truck', depotId: 'DEP-KDY', capacityKg: 1000, capacityM3: 18, refrigeration: 'chilled', isVan: false, defaultDriverId: 'DRV-11', fuelLPer100Km: 18, weeklyFuelBudgetL: 260, maxDailyMin: 600, unavailable: [] },
+{ id: 'TRK-047', type: 'Ambient Truck', depotId: 'DEP-KDY', capacityKg: 1800, capacityM3: 24, refrigeration: 'ambient', isVan: false, defaultDriverId: 'DRV-12', fuelLPer100Km: 16, weeklyFuelBudgetL: 260, maxDailyMin: 600, unavailable: [] },
+{ id: 'VAN-044', type: 'Van', depotId: 'DEP-KDY', capacityKg: 500, capacityM3: 7, refrigeration: 'ambient', isVan: true, defaultDriverId: 'DRV-13', fuelLPer100Km: 11, weeklyFuelBudgetL: 150, maxDailyMin: 600, unavailable: [] }];
