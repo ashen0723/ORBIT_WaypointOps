@@ -3,9 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prebuild": "prisma generate",
     "build": "nest build",
     "start": "node dist/main.js",
+    "prestart:dev": "prisma generate",
     "start:dev": "nest start --watch",
+    "pretest": "prisma generate",
     "test": "jest",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",

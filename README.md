@@ -42,18 +42,22 @@ Sessions are per browser tab: open one tab per role to follow an order across ro
 
 ## Local development (without building images)
 
-Requires Node.js 22+.
+Requires Node.js 22+ and Docker (for the database only).
 
 ```bash
+cp .env.example .env
 npm install
 docker compose up -d db
+npm run db:deploy -w apps/api
+npm run db:seed -w apps/api
 npm run dev:api
 npm run dev:web
 ```
 
-- Web (Vite): <http://localhost:5173> — `/api` is proxied to the API on :3000.
-- Prisma: `cd apps/api && npx prisma migrate dev --name <change>` after editing `prisma/schema.prisma`;
-  `npm run db:seed -w apps/api` to seed.
+- Web (Vite): <http://localhost:5173>. `/api` is proxied to the API on :3000.
+- The Prisma client (`apps/api/src/generated`, gitignored) is generated automatically before `build`, `test`
+  and `start:dev`; run `npx prisma generate` in `apps/api` after editing the schema in an already-running session.
+- Schema changes: `cd apps/api && npx prisma migrate dev --name <change>` after editing `prisma/schema.prisma`.
 - Tests: `npm test` (web: Vitest, api: Jest).
 
 > **npm 11 note:** npm 11 skips package install scripts unless approved. If `prisma` or `bcrypt` misbehave
