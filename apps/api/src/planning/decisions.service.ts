@@ -34,7 +34,7 @@ export class DecisionsService {
   private async loadingView(tx: Tx, tripId: string) {
     const trip = await this.planning.loadTrip(tx, tripId);
     const record = await tx.loadingRecord.findUnique({ where: { tripId }, include: { issues: true } });
-    return { trip: this.planning.tripView(trip), issues: (record?.issues ?? []).map(i => this.issueView(i, trip)) };
+    return { trip: this.planning.tripView(trip), vehicleAvailable: await this.planning.vehicleAvailable(tx, trip), issues: (record?.issues ?? []).map(i => this.issueView(i, trip)) };
   }
   async getLoading(actor: Actor, id: string) {
     return this.db.$transaction(async tx => {
@@ -48,6 +48,7 @@ export class DecisionsService {
     const body = object(input), expected = version(body.expectedPlanVersion);
     return this.planning.mutate(actor, 'START_LOADING', id, body, async tx => {
       const trip = await this.planning.editableTrip(tx, id, expected); this.loader(actor, trip);
+      await this.planning.requireVehicleAvailable(tx, trip);
       const existing = await tx.loadingRecord.findUnique({ where: { tripId: id } });
       await tx.loadingRecord.upsert({ where: { tripId: id }, create: { tripId: id, checkedById: actor.id, startedAt: new Date(), status: 'IN_PROGRESS' }, update: { checkedById: actor.id, startedAt: existing?.startedAt ?? new Date(), status: 'IN_PROGRESS', completedAt: null } });
       await this.invalidateReady(tx, id, false);
@@ -68,6 +69,7 @@ export class DecisionsService {
       if (!line) fail(404, 'NOT_FOUND', 'Line is not assigned to this trip.');
       if (!await tx.loadingRecord.findUnique({ where: { tripId: id } })) fail(409, 'LOADING_NOT_STARTED', 'Start loading first.');
       if (line.version !== lineVersion) fail(409, 'STALE_LINE', 'Line version changed.');
+      if (loadedQty > 0) await this.planning.requireVehicleAvailable(tx, trip);
       if (loadedQty > line.plannedQty - line.cancelledQty) fail(422, 'QUANTITY_EXCEEDED', 'Loaded quantity exceeds the approved attempt quantity.');
       await tx.tripStopLine.update({ where: { id: line.id }, data: { loadedQty, pendingUnload: false, version: { increment: 1 } } });
       await this.invalidateReady(tx, id, false);

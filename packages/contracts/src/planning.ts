@@ -91,3 +91,6 @@ export interface AcknowledgeStopRescheduleRequest extends PlanMutation {
   returnedAt: Instant;
   lines: NonEmptyList<{ orderLineId: Id; returnedQty: number }>;
 }
+
+/** Mark a vehicle unavailable for the trip day; stop loading until the plan is amended. */
+export interface ReportVehicleUnavailableRequest extends PlanMutation { reason: string }

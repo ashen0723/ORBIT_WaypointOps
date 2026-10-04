@@ -1,4 +1,6 @@
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, UnauthorizedException } from '@nestjs/common';
+import { AuthService } from '../auth/auth.service';
+import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { FleetModule } from './fleet.module';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -22,7 +24,8 @@ describe('Fleet HTTP / service integration', () => {
   const findUnique = jest.fn();
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [PrismaModule, FleetModule] })
+    const moduleRef = await Test.createTestingModule({ imports: [ConfigModule.forRoot({ignoreEnvFile:true,skipProcessEnv:true,load:[()=>({JWT_SECRET:'test-only-fleet-secret-at-least-32-characters'})]}), PrismaModule, FleetModule] })
+      .overrideProvider(AuthService).useValue({authenticate: async (header: string) => {if (!header) throw new UnauthorizedException(); return {id: 'dispatcher', role: 'DISPATCHER'};}})
       .overrideProvider(PrismaService)
       .useValue({ vehicle: { findMany, findUnique } }).compile();
     app = moduleRef.createNestApplication();
@@ -36,7 +39,8 @@ describe('Fleet HTTP / service integration', () => {
     findMany.mockResolvedValue([vehicle]);
     findUnique.mockResolvedValue(vehicle);
   });
-  const get = (path: string) => fetch(`${base}/api/vehicles${path}`);
+  const get = (path: string) => fetch(`${base}/api/${path.startsWith('/') ? 'vehicles' : 'fleet/vehicles'}${path}`, {headers: {Authorization: 'Bearer test'}});
+  it('requires authentication for vehicle details', async () => {expect((await fetch(`${base}/api/vehicles/TRK-021`)).status).toBe(401);});
 
   it('lists only projected vehicle data without date scheduling fields', async () => {
     const res = await get('');

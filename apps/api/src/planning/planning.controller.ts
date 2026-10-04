@@ -18,6 +18,8 @@ export class PlanningTripsController {
   constructor(private readonly planning: PlanningService) {}
   @Post('plans/publish') @HttpCode(200) @Roles('DISPATCHER')
   publish(@Req() req: AuthRequest, @Body() body: unknown) { return this.planning.publish(req.user, body); }
+  @Post('trips/:id/vehicle-unavailable') @HttpCode(200) @Roles('LOADER', 'DISPATCHER')
+  unavailable(@Req() req: AuthRequest, @Param('id') id: string, @Body() body: unknown) { return this.planning.reportVehicleUnavailable(req.user, id, body); }
   @Patch('trips/:id/plan') @Roles('DISPATCHER')
   amend(@Req() req: AuthRequest, @Param('id') id: string, @Body() body: unknown) { return this.planning.amend(req.user, id, body); }
   @Post('trips/:id/release') @HttpCode(200) @Roles('DISPATCHER')

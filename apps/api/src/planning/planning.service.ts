@@ -304,11 +304,39 @@ export class PlanningService {
       return this.tripView(await this.loadTrip(tx, id));
     });
   }
+  async vehicleAvailable(tx: Tx, trip: { vehicleId: string; date: Date }) {
+    const [vehicle, daily] = await Promise.all([
+      tx.vehicle.findUnique({where: {id: trip.vehicleId}}),
+      tx.vehicleAvailability.findUnique({where: {vehicleId_date: {vehicleId: trip.vehicleId, date: trip.date}}}),
+    ]);
+    return !!vehicle?.available && daily?.available !== false;
+  }
+  async requireVehicleAvailable(tx: Tx, trip: { vehicleId: string; date: Date }) {
+    if (!await this.vehicleAvailable(tx, trip)) fail(409, 'VEHICLE_UNAVAILABLE', 'Vehicle unavailable. Stop loading and ask Dispatcher to assign a suitable replacement. Unloading is still allowed.');
+  }
+  async reportVehicleUnavailable(actor: Actor, id: string, input: unknown) {
+    const body = object(input), expected = version(body.expectedPlanVersion, 'expectedPlanVersion'), reason = text(body.reason, 'reason');
+    return this.mutate(actor, 'VEHICLE_UNAVAILABLE', id, body, async tx => {
+      const trip = await this.editableTrip(tx, id, expected);
+      if (actor.role !== 'DISPATCHER' && (actor.role !== 'LOADER' || actor.depotId !== trip.depotId || !trip.publishedAt)) fail(403, 'FORBIDDEN', 'Only Dispatcher or the assigned-depot Loader can report this vehicle.');
+      await tx.vehicleAvailability.upsert({where: {vehicleId_date: {vehicleId: trip.vehicleId, date: trip.date}}, create: {vehicleId: trip.vehicleId, date: trip.date, available: false}, update: {available: false}});
+      // Every pre-departure trip using this vehicle on this day must be rechecked.
+      const affected = await tx.trip.findMany({where: {vehicleId: trip.vehicleId, date: trip.date, releasedAt: null, status: {in: ['CONFIRMED', 'LOADING', 'READY']}}});
+      for (const t of affected) {
+        await tx.trip.update({where: {id: t.id}, data: {status: t.status === 'READY' ? 'LOADING' : t.status, loaderAcknowledgedPlanVersion: null, version: {increment: 1}}});
+        await tx.loadingRecord.updateMany({where: {tripId: t.id}, data: {status: 'IN_PROGRESS', completedAt: null}});
+        if(t.status === 'READY') await tx.order.updateMany({where: {stops: {some: {tripId: t.id, active: true}}}, data: {status: 'LOADING', version: {increment: 1}}});
+        await this.audit(tx, actor, 'Trip', t.id, 'VEHICLE_UNAVAILABLE', {vehicleId: trip.vehicleId, date: trip.date.toISOString(), reportedTripId: id}, reason);
+      }
+      return this.tripView(await this.loadTrip(tx, id));
+    });
+  }
   async ready(actor: Actor, id: string, input: unknown) {
     const body = object(input), expected = version(body.expectedPlanVersion, 'expectedPlanVersion');
     return this.mutate(actor, 'READY', id, body, async tx => {
       const trip = await this.editableTrip(tx, id, expected); this.scope(actor, trip);
       if (actor.role !== 'LOADER' || !trip.publishedAt) fail(403, 'FORBIDDEN', 'Only the depot Loader can ready a published plan.');
+      await this.requireVehicleAvailable(tx, trip);
       if (trip.loaderAcknowledgedPlanVersion !== trip.planVersion) fail(409, 'PLAN_ACKNOWLEDGEMENT_REQUIRED', 'Acknowledge the current plan before confirming readiness.');
       const record = await tx.loadingRecord.findUnique({ where: { tripId: id }, include: { issues: true } });
       const stops = trip.stops.filter(s => s.active);

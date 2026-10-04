@@ -104,6 +104,10 @@ function LoaderScreen({
   useEffect(() => {
     sessionStorage.setItem(`waypoint.run-date:${user?.id}`, date);
   }, [date, user?.id]);
+  useEffect(() => {
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void refresh(); }, 10000);
+    return () => window.clearInterval(timer);
+  }, [refresh]);
   const act: LoaderCall = useCallback(
     async <T,>(path: string, body?: unknown, method?: string) => {
       const result = await call<T>(path, body, method);
@@ -285,6 +289,7 @@ function LoaderScreen({
   );
 }
 function displayState(load: LoadingView) {
+  if (load.vehicleAvailable === false) return "attention";
   if (queueState(load) === "completed") return "completed";
   if (queueState(load) === "issues") return "attention";
   return load.trip.status === "LOADING" ? "loading" : "ready";
@@ -392,6 +397,8 @@ function LoadCard({
             ))}
         </ol>
       </details>
+      {load.vehicleAvailable === false && <p role="alert">Vehicle unavailable — stop loading. Dispatcher must assign a replacement. Set checked quantities to zero to confirm unloading any goods already loaded.</p>}
+      {["CONFIRMED", "LOADING", "READY"].includes(trip.status) && load.vehicleAvailable !== false && <details><summary>Report vehicle unavailable</summary><ActionForm title="Stop loading and notify Dispatcher" onSubmit={async (f, key) => {await act(`/trips/${trip.id}/vehicle-unavailable`, {clientActionId: key, expectedPlanVersion: trip.planVersion, reason: String(f.get('reason'))});}}><Field label="Vehicle problem" name="reason" required /></ActionForm></details>}
       <Loading trip={trip} role="loader" call={call} act={act} />
       {!terminal && (
         <details>

@@ -52,6 +52,7 @@ export interface Order {
   requestedDate: string;
   submittedAt: string;
   eta?: string;
+  arrivedAt?: string;
   deliveredAt?: string;
   deliveredDate?: string;
   items: OrderItem[];

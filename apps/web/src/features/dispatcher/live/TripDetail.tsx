@@ -8,9 +8,12 @@ import type {
   LoadingView,
   OperatingDateView,
   RecoveryStateView,
+  ReceiptView,
   TripStopView,
   TripView,
+  VehicleView,
 } from "@waypoint/contracts";
+import { ApiError } from "../../../api/client";
 import { useQuery } from "../../../api/useQuery";
 import {
   Badge,
@@ -125,6 +128,7 @@ export function TripDetail() {
                 </Button>
               )}
             </Panel>
+            {["CONFIRMED", "LOADING", "READY"].includes(trip.status) && <ReplaceVehicle trip={trip} onChanged={query.refresh} />}
             <Panel title="Delivery stops">
               <DataTable
                 caption="Trip delivery sequence"
@@ -263,6 +267,7 @@ function LoadingDecisions({
         {loading.data && (
           <>
             <p>
+              {loading.data.vehicleAvailable === false && <span role="alert">Vehicle unavailable. Replace the vehicle before continuing loading.</span>}
               {loading.data.issues.length
                 ? "Warehouse exceptions and decisions"
                 : "No loading issues reported."}
@@ -542,6 +547,10 @@ function DeliveryDecision({
   const recovery = useQuery(`recovery:${d.id}:${d.version}`, (s) =>
     api.get<RecoveryStateView>(`/deliveries/${d.id}/recovery`, s),
   );
+  const receipt = useQuery(`receipt:${d.id}:${d.version}`, async (signal) => {
+    try { return await api.get<ReceiptView>(`/deliveries/${d.id}/receipt`, signal); }
+    catch (error) { if (error instanceof ApiError && error.status === 404) return null; throw error; }
+  }, 15000);
   const [action, setAction] = useState("CLOSE_WITHOUT_REDELIVERY");
   const from = addDays(trip.date, 1);
   const dates = useQuery(`retry-dates:${order?.outletId}:${from}`, (s) =>
@@ -592,6 +601,16 @@ function DeliveryDecision({
           </label>
         </MutationForm>
       )}
+      <ErrorPanel error={receipt.error} retry={receipt.refresh} />
+      {receipt.data && <section aria-label="Store receipt report">
+        <h3 className="dispatch-section-title">Store receipt report</h3>
+        <Badge status={receipt.data.status} />
+        {receipt.data.lines.map(line => <div key={line.orderLineId}>
+          <p>{order?.lines.find(item => item.id === line.orderLineId)?.item ?? line.orderLineId}: {line.acceptedQty} accepted / {line.damagedQty} damaged / {line.missingQty} missing</p>
+          {line.note && <p>{line.note}</p>}
+          <EvidenceGallery ids={line.photoRefs} />
+        </div>)}
+      </section>}
       <ErrorPanel error={recovery.error} retry={recovery.refresh} />
       {lines.length > 0 && (
         <>
@@ -822,4 +841,15 @@ export function Conflicts({
       )}
     </Panel>
   );
+}
+
+function ReplaceVehicle({trip, onChanged}: {trip: TripView; onChanged: () => void}) {
+  const {api} = useDispatcher();
+  const fleet = useQuery(`replacement:${trip.id}:${trip.version}`, s => api.all<VehicleView>('/vehicles', {date: trip.date, depotId: trip.depotId}, s), 15000);
+  return <Panel title="Vehicle replacement"><p>Unload and set checked quantities to zero before switching a loaded vehicle. The replacement is validated for temperature, access, capacity, windows and fuel.</p>
+    <ErrorPanel error={fleet.error} retry={fleet.refresh}/>
+    <MutationForm key={`vehicle:${trip.planVersion}`} label="Confirm replacement vehicle" onSubmit={async f => {
+      await api.mutate(`/trips/${trip.id}/plan`, {expectedPlanVersion: trip.planVersion, reason: formText(f, 'reason'), plan: {date: trip.date, depotId: trip.depotId, vehicleId: formText(f, 'vehicle'), plannedDeparture: localTime(trip.plannedDepartureAt), orderIds: trip.stops.filter(s => s.status !== 'RESCHEDULED').map(s => s.orderId)}}, 'PATCH'); onChanged(); fleet.refresh();
+    }}><label>Replacement vehicle<select aria-label="Replacement vehicle" name="vehicle" required defaultValue=""><option value="" disabled>Select replacement</option>{(fleet.data ?? []).filter(v => v.id !== trip.vehicleId && v.availableOnDate).map(v => <option key={v.id} value={v.id}>{v.id} · {v.type} · {v.temp}</option>)}</select></label><label>Replacement reason<input name="reason" required /></label></MutationForm>
+  </Panel>;
 }
