@@ -1,3 +1,4 @@
+import { WorkflowModule } from './workflow/workflow.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
@@ -19,6 +20,7 @@ import { SyncModule } from './sync/sync.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env', '../../.env'] }),
     PrismaModule,
+    WorkflowModule,
     CommonModule,
     HealthModule,
     AuthModule,

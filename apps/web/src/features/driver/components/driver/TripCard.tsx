@@ -1,4 +1,3 @@
-import React from 'react';
 import { Clock3Icon, MapPinnedIcon, PackageIcon, SnowflakeIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { DriverTrip } from '../../types/driver';
@@ -6,7 +5,7 @@ import { useDriver } from '../../contexts/DriverContext';
 import { DriverStatusChip } from './DriverStatusChip';
 
 export function TripCard({ trip }: {trip: DriverTrip;}) {
-  const { getTripStatus, getStopRecord } = useDriver();
+  const { getTripStatus, getStopRecord, departedTrips } = useDriver();
   const completed = trip.stops.filter((stop) => ['Delivered', 'Partially delivered', 'Failed', 'Changed by dispatcher'].includes(getStopRecord(trip.id, stop.sequence).status)).length;
   const totalCases = trip.stops.reduce((sum, stop) => sum + stop.cases, 0);
   const chilledCases = trip.stops.reduce((sum, stop) => sum + stop.chilledCases, 0);
@@ -29,9 +28,9 @@ export function TripCard({ trip }: {trip: DriverTrip;}) {
       </div>
       <div className="mt-4">
         <div className={`flex items-center justify-between text-xs font-semibold ${tinted ? 'text-forest/75' : 'text-subtle'}`}><span>Progress</span><span>{completed}/{trip.stops.length}</span></div>
-        <div className={`mt-2 h-2 overflow-hidden rounded-full ${tinted ? 'bg-surface/70' : 'bg-canvas'}`}><div className="h-full rounded-full bg-brand" style={{ width: `${completed / trip.stops.length * 100}%` }} /></div>
+        <div className={`mt-2 h-2 overflow-hidden rounded-full ${tinted ? 'bg-surface/70' : 'bg-canvas'}`}><div className="h-full rounded-full bg-brand" style={{ width: `${trip.stops.length ? completed / trip.stops.length * 100 : 0}%` }} /></div>
       </div>
-      <div className="mt-auto pt-4"><Link to={`/trips/${trip.id}/check`} className={`inline-flex min-h-12 w-full items-center justify-center rounded-full px-5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${tinted ? 'bg-forest text-white' : 'border border-line bg-surface text-ink hover:bg-canvas'}`}>{trip.number === 1 ? 'Start Trip 1 check' : 'View Trip 2'}</Link></div>
+      <div className="mt-auto pt-4"><Link to={`/trips/${trip.id}/${departedTrips[trip.id] ? 'stops' : 'check'}`} className={`inline-flex min-h-12 w-full items-center justify-center rounded-full px-5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${tinted ? 'bg-forest text-white' : 'border border-line bg-surface text-ink hover:bg-canvas'}`}>{departedTrips[trip.id] ? 'Continue route' : `Trip ${trip.number} check`}</Link></div>
     </article>);
 
 }

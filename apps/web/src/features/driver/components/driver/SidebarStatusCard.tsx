@@ -1,4 +1,3 @@
-import React from 'react';
 import { CloudCheckIcon, CloudOffIcon, RefreshCwIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { CurvedLines } from '../ui/CurvedLines';
@@ -12,7 +11,7 @@ export function SidebarStatusCard() {
   const syncing = connection === 'syncing';
   const Icon = offline ? CloudOffIcon : syncing ? RefreshCwIcon : CloudCheckIcon;
   const title = offline ? 'Working offline' : syncing ? 'Syncing records' : 'Ready for the route';
-  const detail = queue.total ? `${queue.total} items saved on this phone · last synced ${lastSyncedAt}` : `Routes saved offline · last synced ${lastSyncedAt}`;
+  const detail = queue.total ? `${queue.total} actions awaiting sync · last synced ${lastSyncedAt}` : `Route data available · last synced ${lastSyncedAt}`;
 
   return (
     <section aria-label="Driver sync status" className="relative overflow-hidden rounded-card bg-forest p-4 text-white">

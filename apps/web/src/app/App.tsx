@@ -1,20 +1,18 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { LOGIN_PATH } from '@waypoint/contracts';
-import { AuthProvider, useAuth } from './providers/AuthProvider';
-import { RoleRouter, type RoleModules } from './RoleRouter';
-import { Login } from './pages/Login';
-import { Landing } from './pages/Landing';
-import { App as DispatcherApp } from '../features/dispatcher/App';
-import { App as StoreManagerApp } from '../features/store-manager/App';
-import { App as LoaderApp } from '../features/loader/App';
-import { DriverApp } from '../features/driver/DriverApp';
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { LOGIN_PATH } from "@waypoint/contracts";
+import { AuthProvider, useAuth } from "./providers/AuthProvider";
+import { RoleRouter, type RoleModules } from "./RoleRouter";
+import { Login } from "./pages/Login";
+import { Landing } from "./pages/Landing";
+import { DispatcherApp } from "../features/dispatcher/live/DispatcherApp";
+import { App as LoaderApp } from "../features/loader/App";
+import { OperationsApp } from "../features/operations/OperationsApp";
 
-/** Each role's prototype keeps its own router; the root mounts exactly one of them under the role's base path. */
 const ROLE_MODULES: RoleModules = {
   dispatcher: DispatcherApp,
-  store_manager: StoreManagerApp,
+  store_manager: OperationsApp,
   loader: LoaderApp,
-  driver: DriverApp,
+  driver: OperationsApp,
 };
 
 const PUBLIC_TREE = (
@@ -29,7 +27,15 @@ const PUBLIC_TREE = (
 
 function SessionRoleRouter() {
   const { user } = useAuth();
-  return <RoleRouter role={user?.role ?? null} userId={user?.id ?? null} modules={ROLE_MODULES} login={PUBLIC_TREE} landing={PUBLIC_TREE} />;
+  return (
+    <RoleRouter
+      role={user?.role ?? null}
+      userId={user?.id ?? null}
+      modules={ROLE_MODULES}
+      login={PUBLIC_TREE}
+      landing={PUBLIC_TREE}
+    />
+  );
 }
 
 export function App() {

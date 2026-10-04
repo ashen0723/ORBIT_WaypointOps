@@ -17,6 +17,7 @@ Prerequisites: Docker Desktop 4.x (Compose v2) and Git.
 
 ```bash
 cp .env.example .env
+# Set JWT_SECRET in .env to a random secret of at least 32 characters before starting the API.
 docker compose up --build
 ```
 
@@ -38,6 +39,9 @@ Password for every account: `waypoint-demo` (set by `SEED_DEMO_PASSWORD`).
 | Store Manager | `store@waypoint.lk` | `/store` |
 | Store Manager (2nd outlet, permission checks) | `store2@waypoint.lk` | `/store` |
 
+The browser uses real JWT login, a dedicated API-backed Dispatcher workspace, and the shared operations workspace for Loader, Driver and Store. See [Dispatcher parts 1–6](docs/thisuni-dispatcher-parts-1-6.md) for implementation and verification.
+See [Team integration and verification](docs/team-integration.md) for setup, handoffs and verified scenarios.
+
 Sessions are per browser tab: open one tab per role to follow an order across roles.
 
 ## Local development (without building images)
@@ -46,10 +50,12 @@ Requires Node.js 22+ and Docker (for the database only).
 
 ```bash
 cp .env.example .env
+# Set JWT_SECRET in .env to a random secret of at least 32 characters before starting the API.
 npm install
 docker compose up -d db
 npm run db:deploy -w apps/api
 npm run db:seed -w apps/api
+npm run db:seed:planning-demo -w apps/api # optional fictional catalog/calendar/travel fixtures
 npm run dev:api
 npm run dev:web
 ```
@@ -59,6 +65,8 @@ npm run dev:web
   and `start:dev`; run `npx prisma generate` in `apps/api` after editing the schema in an already-running session.
 - Schema changes: `cd apps/api && npx prisma migrate dev --name <change>` after editing `prisma/schema.prisma`.
 - Tests: `npm test` (web: Vitest, api: Jest).
+- Database/API integration: `npm run test:integration -w apps/api` (disposable embedded PostgreSQL; localhost ports required).
+- Shared contract checks: `npm run typecheck -w packages/contracts`.
 
 > **npm 11 note:** npm 11 skips package install scripts unless approved. If `prisma` or `bcrypt` misbehave
 > locally, run `npm approve-scripts --allow-scripts-pending` and reinstall. Docker images use npm 10 and are
@@ -71,7 +79,8 @@ apps/
   web/                    React 18 + Vite + Tailwind — one app, four roles
     src/app/              root: login gate + role → module routing
     src/features/
-      dispatcher/         Dispatcher module (+ leader's Login, session, in-browser mock server)
+      operations/         Loader/Driver/Store workspace, durable offline queue
+      dispatcher/         Login/session, live Dispatcher screens + retained prototypes
       store-manager/      Store Manager module
       loader/             Loader module
       driver/             Driver module
@@ -96,11 +105,11 @@ docker-compose.yml        db + api + web
 | Platform | `apps/web/src/app`, `src/api` | `apps/api/src/auth`, `users`, `prisma/`, Docker |
 
 Schema changes: edit `apps/api/prisma/schema.prisma`, create a migration, and coordinate with the DB owner
-before merging. See [docs/architecture.md](docs/architecture.md) for the swap seam from mock data to the API.
+before merging. The integration adapters currently live in `apps/api/src/workflow`; see [team handoffs](docs/team-integration.md) before moving endpoints into owner modules.
 
 ## Judge walkthrough
 
-_To be completed once the backend flows are connected._ Planned outline:
+The connected walkthrough and runnable automated checks are in [Team integration](docs/team-integration.md).
 
 1. Store Manager places an order and notes the order ID.
 2. Dispatcher finds the same order, sees an invalid vehicle rejected with a reason, allocates correctly and publishes.
@@ -111,10 +120,15 @@ _To be completed once the backend flows are connected._ Planned outline:
 
 ## Departures from the Designathon submission
 
-_To be completed by module owners._ Merge-level changes are in [docs/merge-notes.md](docs/merge-notes.md).
+The live form-based integration workspace replaces the disconnected mock modules. Detailed differences and retained prototype features are documented in [Team integration](docs/team-integration.md). Merge-level changes are in [docs/merge-notes.md](docs/merge-notes.md).
 
 ## Documentation
 
+- [Team integration and final verification](docs/team-integration.md)
+
+- [API and workflow contract v1](docs/api-contract-v1.md) — agreed rules, shared DTOs, endpoint ownership,
+  implementation handoffs. [Planning backend](docs/planning-backend.md) tracks implemented routes and remaining handoffs.
+- [Shortfall, recovery, deferral and rescheduling](docs/decisions-and-rescheduling.md)
 - [Architecture](docs/architecture.md)
 - [Data model](docs/data-model.md)
 - [AI tool disclosure](docs/ai-disclosure.md)

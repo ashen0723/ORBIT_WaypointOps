@@ -58,8 +58,6 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
-        VITE_AUTH_SOURCE: ${VITE_AUTH_SOURCE:-mock}
-        VITE_STORE_DATA_SOURCE: ${VITE_STORE_DATA_SOURCE:-mock}
     depends_on:
       # Start as soon as the api container exists: the role modules still run on in-browser mock data, so the
       # app must stay usable even if migrations or the seed fail. nginx only needs the "api" hostname to resolve.

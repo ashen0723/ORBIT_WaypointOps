@@ -129,7 +129,7 @@ A repeat of the same batch is safe. Existing records missing from files are reta
 existing record needs a separate reviewed maintenance action; this CLI has no overwrite option.
 Demo calendar dates are not reserved, but differing values conflict just like other records.
 
-Normal `prisma db seed` remains unchanged and uses insert-only upserts, so it cannot overwrite imported
+Normal `prisma db seed` uses insert-only upserts, so it cannot overwrite imported
 records. The importer never substitutes official rows for demo records. The current schema has no
 provenance tag: demo and official records can coexist, but callers cannot filter by dataset source.
 Use a dedicated migrated database without running the demo seed when an official-only environment is
@@ -142,3 +142,16 @@ rename or delete seeded data to create apparent mappings.
 The full API test command includes both `src` and `prisma` tests. Competition files are never needed.
 The mapping must be supplied by the dataset owner before a real import; headers, enum spellings,
 units, depot aliases and global calendar semantics cannot be inferred from this framework.
+
+
+### STYLE weekly schedule
+
+Outlet mappings must include `scheduledWeekday`: ISO weekday 1 (Monday) through 6 (Saturday).
+Map an authoritative numeric source column with `onBlank: null` for non-STYLE rows. STYLE rows without
+a weekday, Sundays, fractions and out-of-range values are rejected before any writes. A null default
+is permitted only when the source contains no STYLE outlets. The example mapping intentionally leaves
+the source header as a placeholder; no official dataset headers or weekdays are guessed.
+
+The importer uses the main `0001`–`0004` schema. The superseded branch-only workflow migration must not
+be appended to that chain. See [DB seed reconciliation](data-model.md#db-seed--importer-reconciliation-pr-5)
+for fixture details and isolated integration verification.

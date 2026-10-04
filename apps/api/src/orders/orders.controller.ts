@@ -1,44 +1,45 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
-import { OrdersService } from './orders.service';
-import { StoreAuthGuard, StoreRequest } from './store-auth.guard';
-import { catalog } from './catalog';
-import { PrismaService } from '../prisma/prisma.service';
-
-@Controller('orders')
-@UseGuards(StoreAuthGuard)
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from "@nestjs/common";
+import { AuthGuard, Roles, type AuthRequest } from "../auth/auth.guard";
+import { ConnectedOrdersService } from "../workflow/orders.service";
+import { OrderPolicyService } from "./order-policy.service";
+@Controller("orders")
+@UseGuards(AuthGuard)
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
-
+  constructor(
+    private readonly orders: ConnectedOrdersService,
+    private readonly policy: OrderPolicyService,
+  ) {}
+  @Get()
+  @Roles("STORE_MANAGER", "DISPATCHER")
+  list(@Req() r: AuthRequest, @Query() q: Record<string, unknown>) {
+    return this.orders.orders(r.user, q);
+  }
+  @Get("catalog")
+  @Roles("STORE_MANAGER")
+  catalog(@Req() r: AuthRequest, @Query() q: Record<string, unknown>) {
+    return this.orders.catalog(r.user, q);
+  }
+  @Get("policy")
+  @Roles("STORE_MANAGER")
+  policyInfo(@Req() r: AuthRequest, @Query() q: Record<string, unknown>) {
+    return this.policy.scheduling(r.user, q);
+  }
+  @Get(":id")
+  findOne(@Req() r: AuthRequest, @Param("id") id: string) {
+    return this.orders.get(r.user, id);
+  }
   @Post()
-  create(@Req() request: StoreRequest, @Body() body: unknown) {
-    return this.ordersService.create(request.storeUser, body);
-  }
-
-  @Get(':id')
-  findOne(@Req() request: StoreRequest, @Param('id') id: string) {
-    return this.ordersService.findOne(request.storeUser, id);
-  }
-}
-
-@Controller('store/orders')
-@UseGuards(StoreAuthGuard)
-export class StoreOrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
-
-  @Get()
-  list(@Req() request: StoreRequest) {
-    return this.ordersService.list(request.storeUser);
-  }
-}
-
-@Controller('catalog')
-@UseGuards(StoreAuthGuard)
-export class CatalogController {
-  constructor(private readonly prisma: PrismaService) {}
-
-  @Get()
-  async list(@Req() request: StoreRequest) {
-    const outlet = await this.prisma.outlet.findUniqueOrThrow({ where: { id: request.storeUser.outletId } });
-    return catalog.filter(item => item.brand === outlet.brand);
+  @Roles("STORE_MANAGER")
+  create(@Req() r: AuthRequest, @Body() b: unknown) {
+    return this.orders.create(r.user, b);
   }
 }

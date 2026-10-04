@@ -1,4 +1,2 @@
-/**
- * App-wide session. VITE_AUTH_SOURCE=api uses NestJS login; mock remains available for role prototypes.
- */
+/** Real API authentication; sessions are isolated per browser tab. */
 export { SessionProvider as AuthProvider, useSession as useAuth } from '../../features/dispatcher/contexts/SessionContext';

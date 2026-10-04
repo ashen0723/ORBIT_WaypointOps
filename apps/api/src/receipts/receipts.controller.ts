@@ -1,19 +1,25 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
-import { StoreAuthGuard, StoreRequest } from '../orders/store-auth.guard';
-import { ReceiptsService } from './receipts.service';
-
-@Controller('deliveries')
-@UseGuards(StoreAuthGuard)
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+} from "@nestjs/common";
+import { AuthGuard, Roles, type AuthRequest } from "../auth/auth.guard";
+import { ConnectedReceiptsService } from "../workflow/receipts.service";
+@Controller("deliveries")
+@UseGuards(AuthGuard)
 export class ReceiptsController {
-  constructor(private readonly receiptsService: ReceiptsService) {}
-
-  @Get(':id/receipt')
-  findOne(@Req() request: StoreRequest, @Param('id') id: string) {
-    return this.receiptsService.findOne(request.storeUser, id);
+  constructor(private readonly receipts: ConnectedReceiptsService) {}
+  @Get(":id/receipt")
+  get(@Req() r: AuthRequest, @Param("id") id: string) {
+    return this.receipts.get(r.user, id);
   }
-
-  @Post(':id/confirm')
-  confirm(@Req() request: StoreRequest, @Param('id') id: string, @Body() body: unknown) {
-    return this.receiptsService.confirm(request.storeUser, id, body);
+  @Post(":id/confirm")
+  @Roles("STORE_MANAGER")
+  confirm(@Req() r: AuthRequest, @Param("id") id: string, @Body() b: unknown) {
+    return this.receipts.confirm(r.user, id, b);
   }
 }

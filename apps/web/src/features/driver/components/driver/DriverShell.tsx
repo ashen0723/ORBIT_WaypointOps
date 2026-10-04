@@ -1,8 +1,7 @@
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { BellIcon, MenuIcon, TruckIcon } from 'lucide-react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { useDriver } from '../../contexts/DriverContext';
-import { DRIVER } from '../../data/driver';
 import { ConnectionPill } from './ConnectionPill';
 import { DriverLogo } from './DriverLogo';
 import { DriverMobileDrawer } from './DriverMobileDrawer';
@@ -14,7 +13,7 @@ import { SidebarStatusCard } from './SidebarStatusCard';
 const NOTIFICATION_COUNT = 1;
 
 export function DriverShell() {
-  const { connection } = useDriver();
+  const { identity: DRIVER, connection, demoMode, actions, error, retryAction, acknowledgeConflict } = useDriver();
   const location = useLocation();
   const [language, setLanguage] = useState('EN');
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -61,19 +60,22 @@ export function DriverShell() {
           </header>
         </div>
 
-        <main className="mt-0 flex-1 bg-canvas px-4 pb-28 pt-5 md:mt-4 md:rounded-panel md:px-5 md:pb-5 md:pt-6 xl:px-7 xl:pb-7 xl:pt-7">
+        <main className="mt-0 flex-1 bg-canvas px-4 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-5 md:mt-4 md:rounded-panel md:px-5 md:pb-5 md:pt-6 xl:px-7 xl:pb-7 xl:pt-7">
           <div className="mx-auto w-full max-w-[1440px]">
             <div className="mb-6 hidden xl:block">
               <p className="flex items-center gap-2 text-sm text-subtle"><span>{DRIVER.date}</span><span aria-hidden>·</span><TruckIcon aria-hidden className="h-4 w-4 text-forest" /><span>{DRIVER.vehicle} · {DRIVER.vehicleType} · {DRIVER.depot}</span></p>
               <h1 className="mt-2 text-3xl font-bold tracking-tight text-ink">{pageTitle(location.pathname)}</h1>
               <p className="mt-2 text-sm text-subtle">{pageSubtitle(location.pathname)}</p>
             </div>
+            {demoMode && <div role="status" className="mb-4 rounded-card bg-amber-pale p-4 text-sm text-amber-ink">Demo route and vehicle — no backend or persistent queue connected. Actions stay in memory and are lost on refresh.</div>}
+            {error && <p role="alert" className="mb-4 text-danger-ink">{error}</p>}
+            {actions.length > 0 && <section aria-label="Synchronization" className="mb-4 space-y-3">{actions.map(action => <div key={action.id} className="rounded-card border border-line p-4 text-sm break-words"><p>{action.tripId}{action.sequence !== undefined ? ` · Stop ${action.sequence}` : ''} · {action.kind} · {action.state}</p>{action.message && <p>{action.message}</p>}{['Failed', 'Conflict', 'Needs attention'].includes(action.state) && <button className="min-h-12 underline" onClick={() => retryAction(action.id)}>Retry action</button>}{action.state === 'Conflict' && <button className="ml-3 min-h-12 underline" onClick={() => acknowledgeConflict(action.id)}>Acknowledge review</button>}</div>)}</section>}
             <Outlet />
           </div>
         </main>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface px-1 pb-1 pt-1 md:hidden"><DriverNav variant="bottom" /></div>
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface px-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-1 md:hidden"><DriverNav variant="bottom" /></div>
       <DriverMobileDrawer open={drawerOpen} onClose={closeDrawer} />
     </div>);
 
@@ -97,5 +99,5 @@ function pageSubtitle(pathname: string): string {
   if (pathname.includes('/stops')) return 'Follow the dispatch sequence and keep every record ready to sync.';
   if (pathname.startsWith('/report-issue')) return 'Send an issue to Dispatch with minimal typing.';
   if (pathname.startsWith('/profile')) return 'Driver, vehicle, and offline readiness details.';
-  return 'Today’s delivery work for Nuwan Perera.';
+  return 'Today’s assigned delivery work.';
 }
