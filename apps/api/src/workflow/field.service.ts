@@ -473,9 +473,13 @@ export class FieldService {
     const items = await this.db.delivery.findMany({
       where: { stop: { orderId: id } },
       orderBy: { createdAt: "asc" },
+      include: { stop: { select: { arrivedAt: true } } },
     });
     return {
-      items: items.map((d) => this.deliveryView(d, id)),
+      items: items.map((d) => ({
+        ...this.deliveryView(d, id),
+        arrivedAt: d.stop.arrivedAt?.toISOString() ?? null,
+      })),
       nextCursor: null,
     };
   }

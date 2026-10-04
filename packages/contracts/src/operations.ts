@@ -91,6 +91,8 @@ export interface DeliveryView {
   capturedAt: Instant;
   recordedAt: Instant;
   requiresDispatcherReview: boolean;
+  /** When the driver arrived at the stop for this attempt (optional; list views include it). */
+  arrivedAt?: Instant | null;
 }
 export interface ReceiptLineInput {
   orderLineId: Id;
