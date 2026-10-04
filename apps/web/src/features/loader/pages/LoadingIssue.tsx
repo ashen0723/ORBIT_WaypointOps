@@ -66,6 +66,8 @@ export function LoadingIssue() {
     reportIssue,
     recordReplacement,
     reportDamagedIssue,
+    issueSavingItemId,
+    issueErrors,
   } = useLoader();
 
   const requestedTripId =
@@ -222,9 +224,18 @@ export function LoadingIssue() {
       safeDamagedQuantity,
     );
 
+  const issueSaving =
+    issueSavingItemId ===
+    target.itemId;
+
+  const issueError =
+    issueErrors[
+    target.itemId
+    ];
+
   const reportMissing =
     () => {
-      reportIssue(
+      void reportIssue(
         target,
         'missing',
         note,
@@ -234,7 +245,7 @@ export function LoadingIssue() {
 
   const saveReplacement =
     () => {
-      recordReplacement(
+      void recordReplacement(
         target,
         safeDamagedQuantity,
         note,
@@ -244,7 +255,7 @@ export function LoadingIssue() {
 
   const reportDamage =
     () => {
-      reportDamagedIssue(
+      void reportDamagedIssue(
         target,
         safeDamagedQuantity,
         note,
@@ -670,6 +681,12 @@ export function LoadingIssue() {
             </button>
           </div>
 
+          {issueError && (
+            <p className="border-t border-danger/20 bg-danger-pale px-5 py-3 text-sm font-medium text-danger-ink md:px-6">
+              {issueError}
+            </p>
+          )}
+
           <div className="flex flex-col-reverse gap-3 border-t border-line p-5 sm:flex-row sm:justify-end md:p-6">
             <Link
               to={
@@ -689,7 +706,8 @@ export function LoadingIssue() {
                   size="lg"
                   disabled={
                     missingQuantity ===
-                    0
+                    0 ||
+                    issueSaving
                   }
                   onClick={
                     reportMissing
@@ -700,8 +718,9 @@ export function LoadingIssue() {
                     className="h-4 w-4"
                   />
 
-                  Report to
-                  Dispatcher
+                  {issueSaving
+                    ? 'Saving…'
+                    : 'Report to Dispatcher'}
                 </Button>
               )}
 
@@ -711,6 +730,9 @@ export function LoadingIssue() {
               true && (
                 <Button
                   size="lg"
+                  disabled={
+                    issueSaving
+                  }
                   onClick={
                     saveReplacement
                   }
@@ -720,9 +742,9 @@ export function LoadingIssue() {
                     className="h-4 w-4"
                   />
 
-                  Record
-                  Replacement
-                  &amp; Continue
+                  {issueSaving
+                    ? 'Saving…'
+                    : 'Record Replacement & Continue'}
                 </Button>
               )}
 
@@ -732,6 +754,9 @@ export function LoadingIssue() {
               false && (
                 <Button
                   size="lg"
+                  disabled={
+                    issueSaving
+                  }
                   onClick={
                     reportDamage
                   }
@@ -741,8 +766,9 @@ export function LoadingIssue() {
                     className="h-4 w-4"
                   />
 
-                  Report to
-                  Dispatcher
+                  {issueSaving
+                    ? 'Saving…'
+                    : 'Report to Dispatcher'}
                 </Button>
               )}
           </div>

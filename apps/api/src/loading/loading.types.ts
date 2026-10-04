@@ -129,6 +129,7 @@ export interface CreateLoadingIssueBody {
   orderLineId: string;
   type: 'MISSING' | 'DAMAGED';
   availableQty: number;
+  replacementLoaded?: boolean;
   note?: string;
   evidenceRef?: string;
 }

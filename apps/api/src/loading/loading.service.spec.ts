@@ -386,6 +386,46 @@ describe('LoadingService', () => {
     }, { id: 'USR-LDR', depotId: 'DEP-PLG' })).rejects.toMatchObject({ status: 400 });
   });
 
+  it('records an identical damaged replacement without creating a shortfall', async () => {
+    const findUnique = jest.fn().mockResolvedValue({
+      id: 'LINE-1', requestedQty: 20, loadedQty: 20,
+      order: {
+        stop: {
+          trip: {
+            id: 'TRIP-1', depotId: 'DEP-PLG', status: 'LOADING',
+            loadingRecord: { id: 'LOAD-1', status: 'IN_PROGRESS' },
+          },
+        },
+      },
+    });
+    const createIssue = jest.fn().mockResolvedValue({
+      id: 'ISSUE-1', loadingRecordId: 'LOAD-1', orderLineId: 'LINE-1',
+      type: 'DAMAGED', expectedQty: 20, availableQty: 20,
+      note: null, evidenceRef: null, status: 'REPLACEMENT_LOADED',
+      decision: null, createdAt: new Date('2026-10-05T04:45:00.000Z'),
+    });
+    const transaction = jest.fn(async (callback) => callback({
+      orderLine: { update: jest.fn().mockResolvedValue({}) },
+      loadingIssue: { create: createIssue },
+      auditEvent: { create: jest.fn().mockResolvedValue({}) },
+    }));
+    const issueService = new LoadingService({
+      orderLine: { findUnique },
+      loadingIssue: { findFirst: jest.fn().mockResolvedValue(null) },
+      $transaction: transaction,
+    } as unknown as PrismaService);
+
+    await expect(issueService.reportIssue('TRIP-1', {
+      orderLineId: 'LINE-1', type: 'DAMAGED', availableQty: 20,
+      replacementLoaded: true,
+    }, { id: 'USR-LDR', depotId: 'DEP-PLG' })).resolves.toMatchObject({
+      status: 'REPLACEMENT_LOADED', shortfallQty: 0,
+    });
+    expect(createIssue).toHaveBeenCalledWith({
+      data: expect.objectContaining({ status: 'REPLACEMENT_LOADED', availableQty: 20 }),
+    });
+  });
+
   it('rejects a second open issue for the same line', async () => {
     const findUnique = jest.fn().mockResolvedValue({
       id: 'LINE-1', requestedQty: 20, loadedQty: 16,
@@ -573,6 +613,39 @@ describe('LoadingService', () => {
       }),
     });
     expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('allows readiness for a locally replaced issue without acknowledgement', async () => {
+    const findFirst = jest.fn().mockResolvedValue({
+      id: 'TRIP-1', status: 'LOADING',
+      loadingRecord: {
+        id: 'LOAD-1', status: 'IN_PROGRESS', completedAt: null,
+        issues: [{
+          id: 'ISSUE-1', orderLineId: 'LINE-1', status: 'REPLACEMENT_LOADED',
+          expectedQty: 20, availableQty: 20, acknowledgedAt: null,
+        }],
+      },
+      stops: [{
+        orderId: 'ORD-1',
+        order: { lines: [{ id: 'LINE-1', requestedQty: 20, loadedQty: 20 }] },
+      }],
+    });
+    const transaction = jest.fn(async (callback) => callback({
+      loadingRecord: { update: jest.fn().mockResolvedValue({}) },
+      trip: { update: jest.fn().mockResolvedValue({}) },
+      order: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      auditEvent: { create: jest.fn().mockResolvedValue({}) },
+    }));
+    const readinessService = new LoadingService({
+      trip: { findFirst }, $transaction: transaction,
+    } as unknown as PrismaService);
+
+    await expect(readinessService.markTripReady('TRIP-1', {
+      id: 'USR-LDR', depotId: 'DEP-PLG',
+    })).resolves.toMatchObject({
+      tripStatus: 'READY', loadingStatus: 'COMPLETED', alreadyReady: false,
+    });
+    expect(transaction).toHaveBeenCalledTimes(1);
   });
 
   it('returns a completed ready trip without writing again', async () => {

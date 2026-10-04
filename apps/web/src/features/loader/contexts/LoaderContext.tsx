@@ -18,6 +18,7 @@ import type {
 } from '../types/loader';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import {
+  createLoadingIssue,
   fetchLoaderTrip,
   fetchLoaderTrips,
   startLoadingTrip as startLoadingTripRequest,
@@ -56,6 +57,8 @@ interface LoaderContextValue {
   issues: Record<string, LoaderIssue>;
   savingLineIds: string[];
   lineErrors: Record<string, string>;
+  issueSavingItemId: string | null;
+  issueErrors: Record<string, string>;
 
   /**
    * Temporary compatibility state for pages that have not yet been
@@ -86,21 +89,21 @@ interface LoaderContextValue {
     type: LoaderIssueType,
     note: string,
     photoAttached: boolean,
-  ) => void;
+  ) => Promise<void>;
 
   recordReplacement: (
     target: LoaderIssueTarget,
     damagedQuantity: number,
     note: string,
     photoAttached: boolean,
-  ) => void;
+  ) => Promise<void>;
 
   reportDamagedIssue: (
     target: LoaderIssueTarget,
     damagedQuantity: number,
     note: string,
     photoAttached: boolean,
-  ) => void;
+  ) => Promise<void>;
 
   acknowledgeDecision: (
     itemId: string,
@@ -164,6 +167,8 @@ export function LoaderProvider({
 
   const [savingLineIds, setSavingLineIds] = useState<string[]>([]);
   const [lineErrors, setLineErrors] = useState<Record<string, string>>({});
+  const [issueSavingItemId, setIssueSavingItemId] = useState<string | null>(null);
+  const [issueErrors, setIssueErrors] = useState<Record<string, string>>({});
 
   const [
     issues,
@@ -307,6 +312,96 @@ export function LoaderProvider({
     }
   }, [quantities, token]);
 
+  const persistIssue = useCallback(async (
+    target: LoaderIssueTarget,
+    type: LoaderIssueType,
+    availableQty: number,
+    note: string,
+    replacementLoaded = false,
+  ) => {
+    if (!token) {
+      setIssueErrors((current) => ({
+        ...current,
+        [target.itemId]: 'Sign in to report this issue.',
+      }));
+      return;
+    }
+
+    if (!target.tripId || !target.orderLineId) {
+      setIssueErrors((current) => ({
+        ...current,
+        [target.itemId]: 'This item is missing its trip or order-line reference.',
+      }));
+      return;
+    }
+
+    setIssueSavingItemId(target.itemId);
+    setIssueErrors((current) => {
+      const next = { ...current };
+      delete next[target.itemId];
+      return next;
+    });
+
+    try {
+      await createLoadingIssue(token, target.tripId, {
+        orderLineId: target.orderLineId,
+        type: type.toUpperCase() as 'MISSING' | 'DAMAGED',
+        availableQty: Math.max(0, Math.trunc(availableQty)),
+        replacementLoaded,
+        ...(note.trim() ? { note: note.trim() } : {}),
+      });
+      await loadTrip(target.tripId);
+    } catch (error) {
+      setIssueErrors((current) => ({
+        ...current,
+        [target.itemId]: error instanceof Error ? error.message : 'Could not report this issue.',
+      }));
+    } finally {
+      setIssueSavingItemId((current) => current === target.itemId ? null : current);
+    }
+  }, [loadTrip, token]);
+
+  const reportIssue = useCallback(async (
+    target: LoaderIssueTarget,
+    type: LoaderIssueType,
+    note: string,
+    photoAttached: boolean,
+  ) => {
+    void photoAttached;
+    await persistIssue(target, type, quantities[target.itemId] ?? 0, note);
+  }, [persistIssue, quantities]);
+
+  const recordReplacement = useCallback(async (
+    target: LoaderIssueTarget,
+    damagedQuantity: number,
+    note: string,
+    photoAttached: boolean,
+  ) => {
+    void damagedQuantity;
+    void photoAttached;
+    await persistIssue(target, 'damaged', target.expected, note, true);
+  }, [persistIssue]);
+
+  const reportDamagedIssue = useCallback(async (
+    target: LoaderIssueTarget,
+    damagedQuantity: number,
+    note: string,
+    photoAttached: boolean,
+  ) => {
+    void photoAttached;
+    const safeDamagedQuantity = Math.max(
+      1,
+      Math.min(target.expected, Math.trunc(damagedQuantity)),
+    );
+    const currentLoaded = quantities[target.itemId] ?? target.expected;
+    await persistIssue(
+      target,
+      'damaged',
+      Math.max(0, currentLoaded - safeDamagedQuantity),
+      note,
+    );
+  }, [persistIssue, quantities]);
+
   const value =
     useMemo<LoaderContextValue>(
       () => ({
@@ -326,6 +421,8 @@ export function LoaderProvider({
         issues,
         savingLineIds,
         lineErrors,
+        issueSavingItemId,
+        issueErrors,
         reviewedPlanVehicleIds,
         handedOffVehicleIds,
 
@@ -387,6 +484,8 @@ export function LoaderProvider({
           setConfirmedItemIds([]);
           setSavingLineIds([]);
           setLineErrors({});
+          setIssueSavingItemId(null);
+          setIssueErrors({});
           setIssues({});
           setReviewedPlanVehicleIds(
             [],
@@ -398,236 +497,11 @@ export function LoaderProvider({
 
         markItemLoaded: persistLoadedQuantity,
 
-        reportIssue: (
-          target,
-          type,
-          note,
-          photoAttached,
-        ) => {
-          setIssues(
-            (current) => ({
-              ...current,
+        reportIssue,
 
-              [target.itemId]: {
-                ...target,
+        recordReplacement,
 
-                reported: true,
-
-                type,
-
-                loaded:
-                  quantities[
-                  target.itemId
-                  ] ?? 0,
-
-                note:
-                  note.trim(),
-
-                photoAttached,
-
-                /**
-                 * Dispatcher decisions must later
-                 * come from the backend.
-                 */
-                decisionReceived:
-                  false,
-
-                resolution:
-                  'open',
-              },
-            }),
-          );
-        },
-
-        recordReplacement: (
-          target,
-          damagedQuantity,
-          note,
-          photoAttached,
-        ) => {
-          const safeDamagedQuantity =
-            Math.max(
-              1,
-              Math.min(
-                target.expected,
-                Math.trunc(
-                  damagedQuantity,
-                ),
-              ),
-            );
-
-          const currentLoaded =
-            quantities[
-            target.itemId
-            ] ??
-            target.expected;
-
-          /**
-           * An identical replacement restores the damaged
-           * quantity, so the good quantity remains the same
-           * as the quantity that had already been picked.
-           */
-          const finalGoodQuantity =
-            Math.min(
-              target.expected,
-              currentLoaded,
-            );
-
-          setQuantities(
-            (current) => ({
-              ...current,
-
-              [target.itemId]:
-                finalGoodQuantity,
-            }),
-          );
-
-          setConfirmedItemIds(
-            (current) => {
-              if (
-                finalGoodQuantity <
-                target.expected
-              ) {
-                return current.filter(
-                  (id) =>
-                    id !==
-                    target.itemId,
-                );
-              }
-
-              return current.includes(
-                target.itemId,
-              )
-                ? current
-                : [
-                  ...current,
-                  target.itemId,
-                ];
-            },
-          );
-
-          setIssues(
-            (current) => ({
-              ...current,
-
-              [target.itemId]: {
-                ...target,
-
-                reported: true,
-
-                type: 'damaged',
-
-                loaded:
-                  finalGoodQuantity,
-
-                note:
-                  note.trim(),
-
-                photoAttached,
-
-                decisionReceived:
-                  false,
-
-                resolution:
-                  'replacement_loaded',
-
-                damagedQuantity:
-                  safeDamagedQuantity,
-
-                replacementAvailable:
-                  true,
-
-                replacementQuantity:
-                  safeDamagedQuantity,
-              },
-            }),
-          );
-        },
-
-        reportDamagedIssue: (
-          target,
-          damagedQuantity,
-          note,
-          photoAttached,
-        ) => {
-          const safeDamagedQuantity =
-            Math.max(
-              1,
-              Math.min(
-                target.expected,
-                Math.trunc(
-                  damagedQuantity,
-                ),
-              ),
-            );
-
-          const currentLoaded =
-            quantities[
-            target.itemId
-            ] ??
-            target.expected;
-
-          const goodQuantity =
-            Math.max(
-              0,
-              currentLoaded -
-              safeDamagedQuantity,
-            );
-
-          setQuantities(
-            (current) => ({
-              ...current,
-
-              [target.itemId]:
-                goodQuantity,
-            }),
-          );
-
-          setConfirmedItemIds(
-            (current) =>
-              current.filter(
-                (id) =>
-                  id !==
-                  target.itemId,
-              ),
-          );
-
-          setIssues(
-            (current) => ({
-              ...current,
-
-              [target.itemId]: {
-                ...target,
-
-                reported: true,
-
-                type: 'damaged',
-
-                loaded:
-                  goodQuantity,
-
-                note:
-                  note.trim(),
-
-                photoAttached,
-
-                decisionReceived:
-                  false,
-
-                resolution: 'open',
-
-                damagedQuantity:
-                  safeDamagedQuantity,
-
-                replacementAvailable:
-                  false,
-
-                replacementQuantity:
-                  0,
-              },
-            }),
-          );
-        },
+        reportDamagedIssue,
 
         acknowledgeDecision: (
           itemId,
@@ -718,7 +592,12 @@ export function LoaderProvider({
         reviewedPlanVehicleIds,
         savingLineIds,
         lineErrors,
+        issueSavingItemId,
+        issueErrors,
         persistLoadedQuantity,
+        reportIssue,
+        recordReplacement,
+        reportDamagedIssue,
         tripDataById,
       ],
     );

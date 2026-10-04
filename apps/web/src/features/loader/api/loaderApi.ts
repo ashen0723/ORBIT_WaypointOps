@@ -120,6 +120,31 @@ export interface LoadedQuantityDto {
   complete: boolean;
 }
 
+export interface CreateLoadingIssueBody {
+  orderLineId: string;
+  type: 'MISSING' | 'DAMAGED';
+  availableQty: number;
+  replacementLoaded?: boolean;
+  note?: string;
+  evidenceRef?: string;
+}
+
+export interface LoadingIssueDto {
+  issueId: string;
+  tripId: string;
+  loadingRecordId: string;
+  orderLineId: string;
+  type: string;
+  expectedQty: number;
+  availableQty: number;
+  shortfallQty: number;
+  note: string | null;
+  evidenceRef: string | null;
+  decision: string | null;
+  status: string;
+  createdAt: string;
+}
+
 export async function fetchLoaderTrips(
   token: string,
   signal?: AbortSignal,
@@ -163,6 +188,21 @@ export function updateLoadedQuantity(
       method: 'PATCH',
       token,
       body: JSON.stringify({ loadedQty }),
+    },
+  );
+}
+
+export function createLoadingIssue(
+  token: string,
+  tripId: string,
+  body: CreateLoadingIssueBody,
+): Promise<LoadingIssueDto> {
+  return apiFetch<LoadingIssueDto>(
+    `/loading/${encodeURIComponent(tripId)}/issues`,
+    {
+      method: 'POST',
+      token,
+      body: JSON.stringify(body),
     },
   );
 }

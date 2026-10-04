@@ -408,9 +408,14 @@ export class LoadingService {
       throw new ConflictException('Issues can only be reported while loading is in progress.');
     }
 
-    if (body.availableQty >= line.requestedQty) {
+    const replacementLoaded =
+      body.type === 'DAMAGED' &&
+      body.replacementLoaded === true &&
+      body.availableQty === line.requestedQty;
+
+    if (body.availableQty >= line.requestedQty && !replacementLoaded) {
       throw new BadRequestException(
-        `availableQty must be below the expected quantity of ${line.requestedQty}.`,
+        `availableQty must be below ${line.requestedQty}, unless all damaged units were replaced.`,
       );
     }
 
@@ -445,7 +450,7 @@ export class LoadingService {
           availableQty: body.availableQty,
           note,
           evidenceRef,
-          status: 'OPEN',
+          status: replacementLoaded ? 'REPLACEMENT_LOADED' : 'OPEN',
         },
       });
 
@@ -462,6 +467,7 @@ export class LoadingService {
             expectedQty: line.requestedQty,
             availableQty: body.availableQty,
             shortfallQty: line.requestedQty - body.availableQty,
+            replacementLoaded,
             evidenceRef,
           },
         },
@@ -606,7 +612,7 @@ export class LoadingService {
           issueId: issue.id,
           orderLineId: issue.orderLineId,
         });
-      } else if (!issue.acknowledgedAt) {
+      } else if (issue.status !== 'REPLACEMENT_LOADED' && !issue.acknowledgedAt) {
         blockers.push({
           type: 'DECISION_NOT_ACKNOWLEDGED',
           issueId: issue.id,
