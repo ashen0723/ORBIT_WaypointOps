@@ -19,7 +19,6 @@ import type { Response } from "express";
 import { AuthGuard, Roles, type AuthRequest } from "../auth/auth.guard";
 import { ConnectedOrdersService } from "./orders.service";
 import { FieldService, type UploadedEvidence } from "./field.service";
-import { ConnectedReceiptsService } from "./receipts.service";
 import { PlanningService } from "../planning/planning.service";
 @Controller()
 @UseGuards(AuthGuard)
@@ -27,7 +26,6 @@ export class WorkflowController {
   constructor(
     private readonly orders: ConnectedOrdersService,
     private readonly field: FieldService,
-    private readonly receipts: ConnectedReceiptsService,
     private readonly planning: PlanningService,
   ) {}
   @Get("catalog") @Roles("STORE_MANAGER") catalog(
@@ -35,12 +33,6 @@ export class WorkflowController {
     @Query() q: Record<string, unknown>,
   ) {
     return this.orders.catalog(r.user, q);
-  }
-  @Post("orders") @Roles("STORE_MANAGER") create(
-    @Req() r: AuthRequest,
-    @Body() b: unknown,
-  ) {
-    return this.orders.create(r.user, b);
   }
   @Get("store/orders") @Roles("STORE_MANAGER") store(
     @Req() r: AuthRequest,
@@ -54,9 +46,6 @@ export class WorkflowController {
   ) {
     return this.orders.orders(r.user, q);
   }
-  @Get("orders/:id") get(@Req() r: AuthRequest, @Param("id") id: string) {
-    return this.orders.get(r.user, id);
-  }
   @Get("orders/:id/deliveries") deliveries(
     @Req() r: AuthRequest,
     @Param("id") id: string,
@@ -66,8 +55,16 @@ export class WorkflowController {
   @Get("depots") @Roles("DISPATCHER") depots() {
     return this.orders.depots();
   }
-  @Get('outlets') @Roles('DISPATCHER') outlets(@Query() q:Record<string,unknown>){return this.orders.outlets(q);}
-  @Get('planning/calendar') @Roles('DISPATCHER') calendar(@Query() q:Record<string,unknown>){return this.orders.calendar(q);}
+  @Get("outlets") @Roles("DISPATCHER") outlets(
+    @Query() q: Record<string, unknown>,
+  ) {
+    return this.orders.outlets(q);
+  }
+  @Get("planning/calendar") @Roles("DISPATCHER") calendar(
+    @Query() q: Record<string, unknown>,
+  ) {
+    return this.orders.calendar(q);
+  }
   @Get("vehicles") @Roles("DISPATCHER") vehicles(
     @Query() q: Record<string, unknown>,
   ) {
@@ -105,19 +102,6 @@ export class WorkflowController {
     @Param("id") id: string,
   ) {
     return this.field.getDelivery(r.user, id);
-  }
-  @Get("deliveries/:id/receipt") receipt(
-    @Req() r: AuthRequest,
-    @Param("id") id: string,
-  ) {
-    return this.receipts.get(r.user, id);
-  }
-  @Post("deliveries/:id/confirm") @Roles("STORE_MANAGER") confirm(
-    @Req() r: AuthRequest,
-    @Param("id") id: string,
-    @Body() b: unknown,
-  ) {
-    return this.receipts.confirm(r.user, id, b);
   }
   @Post("deliveries/:id/review") @HttpCode(200) @Roles("DISPATCHER") review(
     @Req() r: AuthRequest,

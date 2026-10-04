@@ -46,6 +46,51 @@ module.exports = async ({ db, request, base, tokens }) => {
       unitVolumeM3: 0.2,
     },
   });
+  // Store API additions must coexist with the canonical workflow routes.
+  for (const route of [
+    "/orders",
+    "/orders/catalog",
+    "/orders/policy",
+    "/outlets/me",
+  ]) {
+    await request(route, undefined, "anonymous", "GET", 401);
+    await request(route, undefined, "driver", "GET", 403);
+  }
+  assert.equal(
+    (await request("/outlets/me", undefined, "store", "GET")).id,
+    "A",
+  );
+  await request("/outlets/me", undefined, "foreign-store", "GET", 403);
+  const outletTemplate = await db.outlet.findUniqueOrThrow({
+    where: { id: "A" },
+  });
+  await db.outlet.create({ data: { ...outletTemplate, id: "STORE-OTHER" } });
+  await db.user.update({
+    where: { id: "foreign-store" },
+    data: { outletId: "STORE-OTHER" },
+  });
+  assert.equal(
+    (await request("/outlets/me", undefined, "foreign-store", "GET")).id,
+    "STORE-OTHER",
+  );
+  assert.deepEqual(
+    await request("/orders/catalog", undefined, "store", "GET"),
+    await request("/catalog", undefined, "store", "GET"),
+  );
+  const policy = await request(
+    `/orders/policy?requestedDate=${days[0]}`,
+    undefined,
+    "store",
+    "GET",
+  );
+  assert.equal(policy.effectiveDate, days[0]);
+  await request(
+    "/orders/policy?requestedDate=2026-02-30",
+    undefined,
+    "store",
+    "GET",
+    400,
+  );
   const createdBody = mutation({
     requestedDate: days[0],
     temp: "CHILLED",
@@ -59,6 +104,15 @@ module.exports = async ({ db, request, base, tokens }) => {
   );
   assert.equal(created.order.weightKg, 40);
   assert.equal(created.order.outletId, "A");
+  assert.equal(created.order.plannedDate, policy.effectiveDate);
+  assert.deepEqual(
+    await request("/orders?limit=1", undefined, "store", "GET"),
+    await request("/store/orders?limit=1", undefined, "store", "GET"),
+  );
+  assert.deepEqual(
+    await request("/orders?limit=1", undefined, "dispatcher", "GET"),
+    await request("/dispatcher/orders?limit=1", undefined, "dispatcher", "GET"),
+  );
   const order = created.order,
     lineId = order.lines[0].id;
   await request(`/orders/${order.id}`, undefined, "foreign-store", "GET", 403);

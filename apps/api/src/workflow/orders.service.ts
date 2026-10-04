@@ -13,6 +13,20 @@ export function runCutoff(day: string): Date {
   previous.setUTCDate(previous.getUTCDate() - 1);
   return localInstant(previous.toISOString().slice(0, 10), "16:00");
 }
+// Shared by creation and the Store policy preview; exact cutoff is closed.
+export function eligibleRun<T extends { date: Date }>(
+  days: T[],
+  outlet: { brand: string; scheduledWeekday: number | null },
+  receivedAt: Date,
+): T | undefined {
+  return days.find(
+    (d) =>
+      d.date.getUTCDay() !== 0 &&
+      (outlet.brand !== "STYLE" ||
+        d.date.getUTCDay() === outlet.scheduledWeekday) &&
+      receivedAt < runCutoff(d.date.toISOString().slice(0, 10)),
+  );
+}
 @Injectable()
 export class ConnectedOrdersService {
   constructor(
@@ -114,13 +128,7 @@ export class ConnectedOrdersService {
         orderBy: { date: "asc" },
         take: 366,
       });
-      const run = days.find(
-        (d) =>
-          d.date.getUTCDay() !== 0 &&
-          (outlet.brand !== "STYLE" ||
-            d.date.getUTCDay() === outlet.scheduledWeekday) &&
-          receivedAt < runCutoff(d.date.toISOString().slice(0, 10)),
-      );
+      const run = eligibleRun(days, outlet, receivedAt);
       if (!run)
         fail(
           422,

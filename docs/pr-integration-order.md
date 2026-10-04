@@ -1,17 +1,17 @@
 # Remaining PR integration order
 
-Reviewed with main `f7a46c8` (PRs #2, #4, #8, #5 and #6 already merged).
+Reviewed with main `1d8d93d`: #2, #4, #8, #5, #6, #10 and #9 are merged.
 No remote PRs were merged or closed during this review.
 
 | Order | PR / branch | Required work before merge |
 |---|---|---|
-| 1 | #10 `feature/frontend-auth` | Reconcile the three frontend conflicts; preserve live JWT contracts, multipart uploads and offline Driver capture. Fixes prepared locally in this merge. |
-| 2 | #9 `feature/fleet-api` | No text conflicts in the simulation, but `/vehicles` duplicates the existing guarded workflow route with a different response shape. Unify endpoint ownership, pagination, fuel and availability facts before merging. |
-| 3 | #13 `feature/storeManager` | Reconcile schema/seed/auth changes and duplicate order/receipt routes with the current shared contracts. Retain immutable delivery and receipt/recovery accounting. |
-| 4 | #11 `feature/mansandi` | Reconcile UsersService and existing trip/delivery/sync route ownership. Add current auth/scoping to new routes; preserve durable evidence and replay/conflict semantics. |
-| 5 | #12 `loader` | Reconcile schema/client conflicts and the Loader API/UI with the settled backend; explicitly mount and test its live entry point. |
-| 6 | #7 `vihandu` | Connect DriverIntegration to the real backend and durable outbox before replacing the currently mounted OperationsApp Driver surface. No text conflict does not establish live integration. |
-| 7 | #3 `mansi` | Separate unique landing/login/Store UI work from duplicated auth/schema/importer/backend changes, then integrate those unique changes into current routes. |
+| 1 | #13 `feature/storeManager` | Prepared locally: preserve main schema/auth and canonical order/receipt mutations; add scoped outlet/policy/queue/catalog endpoints. |
+| 2 | #11 `feature/mansandi` | Reconcile UsersService and trip/delivery/sync route ownership; preserve auth scope, evidence and replay/conflict semantics. |
+| 3 | #12 `loader` | Reconcile schema/client and Loader API/UI, mount and test the live entry point. |
+| 4 | #7 `vihandu` | Connect DriverIntegration to the backend and durable outbox before replacing the mounted Driver flow. |
+| 5 | #3 `mansi` | Separate unique landing/login/Store UI from duplicated auth/schema/importer/backend changes. |
+
+Main already contains #9's duplicate Fleet `/vehicles` route and unguarded detail handler. Its merge status does not establish contract/security reconciliation; schedule a follow-up to unify these with the guarded paginated workflow fleet projection.
 
 This is a proposed integration sequence, not permission to bulk-merge. Refresh each branch against
 main after the previous merge and inspect its new diff. Backend contract reconciliation is required
@@ -27,3 +27,12 @@ real bearer tokens, guarded expiry and logout races, and offline restoration for
 The prototype mock-session adapter is removed. Verification passed: 158 tests (115 API, 43 web),
 contract/live-app type checks, production builds, and native PostgreSQL + Chromium four-role flows
 including offline Driver image capture, reload and reconnect replay. No commit or push was performed.
+
+## #13 verification
+
+The reconciliation passed 192 tests (149 API, 43 web), contract/live frontend and Prisma
+seed/importer type checks, both production builds, and disposable PostgreSQL + Chromium
+four-role and Dispatcher flows. Store alias/auth/outlet/policy checks run in the real HTTP
+suite, alongside partial receipts and recovery. Fresh Prisma migration deployment and
+seed/importer replay also passed against a disposable database. Changes are staged on
+`feature/storeManager`; no commit, push or remote merge was performed.

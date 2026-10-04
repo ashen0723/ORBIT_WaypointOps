@@ -8,6 +8,7 @@ import { WorkflowController } from "./workflow.controller";
 @Module({
   imports: [AuthModule, PlanningModule],
   controllers: [WorkflowController],
+  exports: [ConnectedOrdersService, ConnectedReceiptsService],
   providers: [ConnectedOrdersService, ConnectedReceiptsService, FieldService],
 })
 export class WorkflowModule {}
