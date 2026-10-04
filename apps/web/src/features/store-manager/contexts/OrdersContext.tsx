@@ -1,7 +1,8 @@
-import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { CatalogItem, NewOrderInput, Order } from '../types/orders';
 import type { ReceiptQuantityLine } from '../api/storeApi';
 import { confirmReceipt as postReceipt, createOrder, fetchCatalog, fetchOrders } from '../api/storeApi';
+import { ApiError } from '../../../api/client';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { catalog as demoCatalog } from '../data/catalog';
 import { seedOrders } from '../data/orders';
@@ -25,7 +26,7 @@ interface OrdersContextValue {
 const OrdersContext = createContext<OrdersContextValue | null>(null);
 
 export function OrdersProvider({ children }: { children: ReactNode }) {
-  const { token } = useAuth();
+  const { token, expire } = useAuth();
   const [orders, setOrders] = useState<Order[]>(live ? [] : seedOrders);
   const [catalog, setCatalog] = useState<CatalogItem[]>(live ? [] : demoCatalog);
   const [loading, setLoading] = useState(live);
@@ -41,9 +42,10 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
       setOrders(nextOrders);
       setError(null);
     } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 401) expire();
       setError(cause instanceof Error ? cause.message : 'Could not load Store orders.');
     } finally { setLoading(false); }
-  }, [token]);
+  }, [token, expire]);
 
   useEffect(() => {
     void refresh();
