@@ -140,9 +140,8 @@ it('renders the core route and visible retry/review controls for arbitrary confl
   expect(screen.getByText(/shared-trip · Stop 8/)).toBeTruthy();
   expect(screen.getByText('No assigned released trips are available.')).toBeTruthy();
   expect(screen.getByText('Stop reassigned')).toBeTruthy();
-  await act(async () => fireEvent.click(screen.getByRole('button', {name: 'Retry action'})));
-  expect(integration.retryAction).toHaveBeenCalledWith('conflict-93');
-  await act(async () => fireEvent.click(screen.getByRole('button', {name: 'Acknowledge review'})));
+  expect(screen.queryByRole('button', {name: 'Retry action'})).toBeNull();
+  await act(async () => fireEvent.click(screen.getByRole('button', {name: 'Dismiss local copy — sent to dispatcher'})));
   expect(integration.acknowledgeConflict).toHaveBeenCalledWith('conflict-93');
 });
 

@@ -27,6 +27,9 @@ export class WorkflowController {
     private readonly field: FieldService,
     private readonly planning: PlanningService,
   ) {}
+  @Get("store/context") @Roles("STORE_MANAGER") storeContext(@Req() r: AuthRequest) {
+    return this.orders.storeContext(r.user);
+  }
   @Get("catalog") @Roles("STORE_MANAGER") catalog(
     @Req() r: AuthRequest,
     @Query() q: Record<string, unknown>,

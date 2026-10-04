@@ -1,20 +1,22 @@
 import { apiFetch } from '../../../api/client';
 import type { Brand, CatalogItem, NewOrderInput, Order, OrderStatus } from '../types/orders';
 
+import type { CatalogItemView, CreateOrderResponse, DeliveryView, OrderView, ReceiptView } from '@waypoint/contracts';
+import { ApiError } from '../../../api/client';
 type ApiBrand = 'FRESH' | 'STYLE' | 'TECH';
-type ApiTemp = 'AMBIENT' | 'CHILLED' | 'FROZEN';
-type ApiStatus = 'CONFIRMED' | 'PLANNED' | 'LOADING' | 'READY' | 'IN_TRANSIT' | 'DELIVERED' | 'RECEIVED' | 'DEFERRED';
-
-interface ApiCatalogItem { id: string; name: string; brand: ApiBrand; temp: ApiTemp; unit: string; weightKg: number; volumeM3: number }
-interface ApiAttemptLine { orderLineId: string; deliveredQty: number | null }
-interface ApiDelivery { id: string; version: number; outcome: string; completedAt: string | null; pod: { recipientName: string | null; signatureRef: string | null; photoRef: string | null } | null; receipt: { confirmedAt: string | null } | null }
-interface ApiStop { id: string; lines?: ApiAttemptLine[]; delivery: ApiDelivery | null }
-interface ApiOrderLine { id: string; item: string; unit: string; requestedQty: number; cancelledQty: number; deliveredQty: number }
-interface ApiOrder {
-  id: string; brand: ApiBrand; temp: ApiTemp; status: ApiStatus; requestedDate: string; createdAt: string;
-  lines: ApiOrderLine[]; attempts?: ApiStop[]; deferredToDate: string | null; deferReason: string | null;
-  recoveryPending: boolean;
+export interface StoreContext { outletName: string; brand: ApiBrand; scheduledWeekday: number | null; nextDeliveryDate: string | null; cutoffAt: string | null }
+type ApiOrder = OrderView & { createdAt?: string; plannedArrivalAt?: string | null };
+interface Page<T> { items: T[]; nextCursor: string | null }
+async function allPages<T>(path: string, token: string): Promise<T[]> {
+  const items: T[] = [];
+  let cursor: string | null = null;
+  do {
+    const page: Page<T> = await apiFetch(`${path}?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, { token });
+    items.push(...page.items); cursor = page.nextCursor;
+  } while (cursor);
+  return items;
 }
+export const fetchStoreContext = (token: string) => apiFetch<StoreContext>('/store/context', { token });
 
 export interface ReceiptQuantityLine {
   orderLineId: string; acceptedQty: number; damagedQty: number; missingQty: number; note: string | null; photoRefs: string[];
@@ -42,38 +44,59 @@ export function todayColombo(now = new Date()): string {
 }
 
 const brandToUi: Record<ApiBrand, Brand> = { FRESH: 'Fresh', STYLE: 'Style', TECH: 'Tech' };
-const statusToUi: Record<ApiStatus, OrderStatus> = {
+const statusToUi: Record<OrderView['status'], OrderStatus> = {
   CONFIRMED: 'confirmed', PLANNED: 'planned', LOADING: 'loading', READY: 'loading',
   IN_TRANSIT: 'in_transit', DELIVERED: 'delivered', RECEIVED: 'receipt_confirmed', DEFERRED: 'deferred',
 };
 
-export function mapCatalog(items: ApiCatalogItem[]): CatalogItem[] {
-  return items.map(item => ({ id: item.id, name: item.name, brand: brandToUi[item.brand], type: item.temp === 'AMBIENT' ? 'dry' : 'chilled', unit: item.unit as CatalogItem['unit'], kg: item.weightKg, m3: item.volumeM3 }));
+const time = (value: string) => new Date(value).toLocaleTimeString('en-GB', { timeZone: 'Asia/Colombo', hour: '2-digit', minute: '2-digit', hour12: false });
+export function mapCatalog(items: CatalogItemView[], brand: ApiBrand): CatalogItem[] {
+  return items.map(item => ({ id: item.id, name: item.name, brand: brandToUi[brand], type: item.temp === 'AMBIENT' ? 'dry' : 'chilled', unit: item.unit, kg: item.unitWeightKg, m3: item.unitVolumeM3 }));
 }
-
-export function mapOrder(order: ApiOrder): Order {
-  const latest = [...(order.attempts ?? [])].reverse().find(stop => stop.delivery?.outcome === 'DELIVERED' || stop.delivery?.outcome === 'PARTIAL');
-  const delivery = latest?.delivery;
-  const handedOver = new Map((latest?.lines ?? []).map(line => [line.orderLineId, line.deliveredQty ?? 0]));
+export function mapOrder(order: ApiOrder, deliveries: DeliveryView[] = [], receipts: ReceiptView[] = []): Order {
+  const handovers = deliveries.filter(d => d.outcome !== 'FAILED').sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
+  // An unconfirmed earlier attempt must remain receiptable during recovery/redelivery.
+  const delivery = handovers.find(d => !receipts.some(r => r.deliveryId === d.id)) ?? handovers[0];
+  const receipt = receipts.find(r => r.deliveryId === delivery?.id);
+  const proof = delivery?.recorded.outcome !== 'FAILED' ? delivery?.recorded.proof : undefined;
   return {
     id: order.id, brand: brandToUi[order.brand], type: order.temp === 'AMBIENT' ? 'dry' : 'chilled',
-    status: statusToUi[order.status], requestedDate: order.requestedDate,
-    submittedAt: new Date(order.createdAt).toLocaleString('en-LK', { timeZone: 'Asia/Colombo', dateStyle: 'medium', timeStyle: 'short' }),
-    items: order.lines.map(line => ({ id: line.id, name: line.item, qty: line.requestedQty, unit: line.unit as Order['items'][number]['unit'], deliveredQty: handedOver.get(line.id) })),
-    deliveryId: delivery?.id, deliveryVersion: delivery?.version, receiptConfirmed: Boolean(delivery?.receipt?.confirmedAt),
-    pod: delivery?.pod ? { receivedBy: delivery.pod.recipientName ?? 'Recipient not recorded', location: '', photoRef: delivery.pod.photoRef, signatureRef: delivery.pod.signatureRef } : undefined,
+    status: statusToUi[order.status], requestedDate: order.plannedDate ?? order.requestedDate,
+    submittedAt: order.createdAt ? new Date(order.createdAt).toLocaleString('en-LK', { timeZone: 'Asia/Colombo', dateStyle: 'medium', timeStyle: 'short' }) : 'Recorded by dispatch',
+    eta: order.plannedArrivalAt ? time(order.plannedArrivalAt) : undefined,
+    items: order.lines.map(line => ({ id: line.id, name: line.item, qty: line.requestedQty, unit: line.unit, deliveredQty: delivery?.recorded.lines.find(l => l.orderLineId === line.id)?.deliveredQty })),
+    deliveryId: delivery?.id, deliveryVersion: delivery?.version, receiptConfirmed: Boolean(receipt),
+    pod: proof ? { receivedBy: proof.recipientName, location: '', photoRef: proof.photoRefs[0], signatureRef: proof.signatureRef } : undefined,
     recoveryPending: order.recoveryPending,
-    deliveredAt: delivery?.completedAt ? new Date(delivery.completedAt).toLocaleTimeString('en-GB', { timeZone: 'Asia/Colombo', hour12: false, hour: '2-digit', minute: '2-digit' }) : undefined,
-    deferral: order.status === 'DEFERRED' && order.deferredToDate ? { originalDate: order.requestedDate, newDate: order.deferredToDate, reason: order.deferReason ?? 'Deferred', detail: order.deferReason ?? '', decidedAt: 'See order timeline' } : undefined,
+    deliveredAt: delivery ? time(delivery.capturedAt) : undefined,
+    events: { ...(order.createdAt ? { placed: time(order.createdAt), confirmed: time(order.createdAt) } : {}), ...(delivery ? { delivered: time(delivery.capturedAt) } : {}), ...(receipt ? { receipt_confirmed: time(receipt.confirmedAt) } : {}) },
+    deferral: order.status === 'DEFERRED' && order.deferredToDate ? { originalDate: order.requestedDate, newDate: order.deferredToDate, reason: order.deferReason ?? 'Deferred', detail: order.deferReason ?? '', decidedAt: 'Recorded by dispatch' } : undefined,
   };
 }
-
-export async function fetchCatalog(token: string): Promise<CatalogItem[]> {
-  return mapCatalog(await apiFetch<ApiCatalogItem[]>('/catalog', { token }));
+export async function fetchCatalog(token: string, brand: ApiBrand): Promise<CatalogItem[]> {
+  return mapCatalog(await allPages<CatalogItemView>('/catalog', token), brand);
 }
-
 export async function fetchOrders(token: string): Promise<Order[]> {
-  return (await apiFetch<ApiOrder[]>('/store/orders', { token })).map(mapOrder);
+  const orders = await allPages<ApiOrder>('/store/orders', token);
+  const result: Order[] = [];
+  // Bounded requests avoid flooding the API when loading a large history.
+  for (let offset = 0; offset < orders.length; offset += 5) {
+    result.push(...await Promise.all(orders.slice(offset, offset + 5).map(async order => {
+      if (!order.attemptStopIds.length) return mapOrder(order);
+      try {
+      const response = await apiFetch<Page<DeliveryView>>(`/orders/${encodeURIComponent(order.id)}/deliveries`, { token });
+      const receipts = await Promise.all(response.items.filter(d => d.outcome !== 'FAILED').map(async d => {
+        try { return await apiFetch<ReceiptView>(`/deliveries/${encodeURIComponent(d.id)}/receipt`, { token }); }
+        catch (error) { if (error instanceof ApiError && error.status === 404) return null; throw error; }
+      }));
+      return mapOrder(order, response.items, receipts.filter((r): r is ReceiptView => r !== null));
+      } catch (error) {
+        if (error instanceof ApiError && [401, 403].includes(error.status)) throw error;
+        return { ...mapOrder(order), deliveryError: error instanceof Error ? error.message : 'Delivery details are unavailable. Please retry.' };
+      }
+    })));
+  }
+  return result;
 }
 
 export async function createOrder(token: string, input: NewOrderInput, catalog: CatalogItem[], clientActionId: string): Promise<Order> {
@@ -82,11 +105,11 @@ export async function createOrder(token: string, input: NewOrderInput, catalog: 
     if (!product?.id) throw new Error(`Choose a catalogue item for ${item.name}.`);
     return { catalogItemId: product.id, requestedQty: item.qty };
   });
-  const saved = await apiFetch<ApiOrder>('/orders', {
+  const saved = await apiFetch<CreateOrderResponse>('/orders', {
     method: 'POST', token,
     body: JSON.stringify({ clientActionId, requestedDate: input.requestedDate, temp: input.type === 'chilled' ? 'CHILLED' : 'AMBIENT', lines }),
   });
-  return mapOrder(saved);
+  return mapOrder({ ...saved.order, createdAt: saved.receivedAt });
 }
 
 export async function confirmReceipt(token: string, deliveryId: string, expectedDeliveryVersion: number, lines: ReceiptQuantityLine[], clientActionId: string): Promise<void> {

@@ -1,4 +1,3 @@
-import React from 'react';
 import { SnowflakeIcon } from 'lucide-react';
 
 export function ChilledTag() {

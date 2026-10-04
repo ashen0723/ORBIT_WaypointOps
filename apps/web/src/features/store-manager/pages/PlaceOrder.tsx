@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { PackageIcon, SnowflakeIcon } from 'lucide-react';
@@ -34,11 +34,11 @@ const initialDrafts: Record<string, LineDraft[]> = {
 export function PlaceOrder() {
   const navigate = useNavigate();
   const cutoffSeconds = useCutoffSeconds();
-  const { orders, catalog, live, loading, error, addOrder } = useOrders();
+  const { orders, catalog, live, loading, error, store, addOrder } = useOrders();
   const actionId = useRef<string | null>(null);
   const screenInit = useScreenInit();
-  const initialBrand = (['Fresh', 'Style', 'Tech'] as Brand[]).includes(screenInit.brand) ? screenInit.brand : 'Fresh';
-  const initialFreshType = (['dry', 'chilled'] as OrderType[]).includes(screenInit.freshType) ? screenInit.freshType : 'dry';
+  const initialBrand = (['Fresh', 'Style', 'Tech'] as Brand[]).includes(screenInit.brand ?? 'Fresh') ? (screenInit.brand ?? 'Fresh') : 'Fresh';
+  const initialFreshType = (['dry', 'chilled'] as OrderType[]).includes(screenInit.freshType ?? 'dry') ? (screenInit.freshType ?? 'dry') : 'dry';
   const [brand, setBrand] = useState<Brand>(initialBrand);
   const [freshType, setFreshType] = useState<OrderType>(initialFreshType);
   const [drafts, setDrafts] = useState(live ? {} : initialDrafts);
@@ -53,14 +53,15 @@ export function PlaceOrder() {
 
   const type: OrderType = brand === 'Fresh' ? freshType : 'dry';
   const key = `${brand}-${type}`;
-  const lines = drafts[key] ?? [createBlankLine()];
-  const delivery = live ? { date: nextDeliveryDateColombo(), note: 'Next operating run; final date confirmed by dispatch' } : NEXT_DELIVERY[brand];
+  const lines = drafts[key] ?? [{ id: `initial-${key}`, name: '', qty: '', unit: suggestionsUnit() }];
+  function suggestionsUnit() { return catalog.find(c => c.brand === brand && c.type === type)?.unit ?? 'units'; }
+  const delivery = live ? { date: store?.nextDeliveryDate ?? nextDeliveryDateColombo(), note: 'Next eligible delivery run' } : NEXT_DELIVERY[brand];
   const suggestions = catalog.filter((c) => c.brand === brand && c.type === type);
   const valid = lines.filter(isLineComplete).map((l) => ({ name: l.name.trim(), qty: Number(l.qty), unit: l.unit }));
   const hasPartial = lines.some((l) => lineError(l) !== null);
-  const load = estimateLoad(valid);
+  const load = live ? valid.reduce((sum, line) => { const item = suggestions.find(c => c.name === line.name && c.unit === line.unit); return { kg: sum.kg + (item?.kg ?? 0) * line.qty, m3: sum.m3 + (item?.m3 ?? 0) * line.qty }; }, { kg: 0, m3: 0 }) : estimateLoad(valid);
   const totalQty = valid.reduce((s, l) => s + l.qty, 0);
-  const pastCutoff = !live && cutoffSeconds === 0;
+  const pastCutoff = live ? !store?.nextDeliveryDate : cutoffSeconds === 0;
 
   const findSubmitted = (b: Brand, t: OrderType) =>
   orders.find((o) => o.brand === b && o.type === t && o.requestedDate === (live ? delivery.date : NEXT_DELIVERY[b].date));
@@ -68,7 +69,7 @@ export function PlaceOrder() {
 
   const helpText = live && (loading || catalog.length === 0) ? 'Loading your outlet catalogue…' :
   live && error ? error : pastCutoff ?
-  'Submission is closed — the 4:00 PM cutoff has passed. Your draft is kept; submit from 6:00 AM tomorrow for the following run.' :
+  'No eligible delivery run is available. Please contact your dispatch team.' :
   valid.length === 0 ?
   'Add at least one item with a quantity to submit.' :
   hasPartial && showErrors ?
@@ -111,8 +112,8 @@ export function PlaceOrder() {
 
   return (
     <PageContainer>
-      <PageHeader title="Place Order" subtitle={`${live ? 'Your outlet' : OUTLET_NAME} · orders for the next delivery run`} />
-      {live ? <p className="rounded-lg bg-canvas px-4 py-3 text-sm text-subtle">Orders after 4:00 PM Colombo time move to the following operating run.</p> : <CutoffBanner seconds={cutoffSeconds} />}
+      <PageHeader title="Place Order" subtitle={`${live ? (store?.outletName ?? 'Your outlet') : OUTLET_NAME} · orders for the next delivery run`} />
+      <CutoffBanner seconds={cutoffSeconds} />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
         <fieldset disabled={pastCutoff || (live && loading)} className="min-w-0 space-y-6">

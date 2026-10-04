@@ -1,17 +1,18 @@
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { CatalogItem, NewOrderInput, Order } from '../types/orders';
 import type { ReceiptQuantityLine } from '../api/storeApi';
-import { confirmReceipt as postReceipt, createOrder, fetchCatalog, fetchOrders } from '../api/storeApi';
+import { fetchStoreContext, type StoreContext, confirmReceipt as postReceipt, createOrder, fetchCatalog, fetchOrders } from '../api/storeApi';
 import { ApiError } from '../../../api/client';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { catalog as demoCatalog } from '../data/catalog';
 import { seedOrders } from '../data/orders';
 import { nextOrderId } from '../utils/orders';
 
-const live = import.meta.env.VITE_STORE_DATA_SOURCE === 'api';
+const live = true;
 
 interface OrdersContextValue {
   orders: Order[];
+  store: StoreContext | null;
   catalog: CatalogItem[];
   live: boolean;
   loading: boolean;
@@ -27,6 +28,8 @@ const OrdersContext = createContext<OrdersContextValue | null>(null);
 
 export function OrdersProvider({ children }: { children: ReactNode }) {
   const { token, expire } = useAuth();
+  const loaded = useRef(false), refreshing = useRef(false);
+  const [store, setStore] = useState<StoreContext | null>(null);
   const [orders, setOrders] = useState<Order[]>(live ? [] : seedOrders);
   const [catalog, setCatalog] = useState<CatalogItem[]>(live ? [] : demoCatalog);
   const [loading, setLoading] = useState(live);
@@ -35,16 +38,21 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     if (!live) return;
     if (!token) { setError('Sign in again to load Store orders.'); setLoading(false); return; }
-    setLoading(true);
+    if (refreshing.current) return;
+    refreshing.current = true;
+    if (!loaded.current) setLoading(true);
     try {
-      const [nextCatalog, nextOrders] = await Promise.all([fetchCatalog(token), fetchOrders(token)]);
+      const context = await fetchStoreContext(token);
+      setStore(context);
+      const [nextCatalog, nextOrders] = await Promise.all([fetchCatalog(token, context.brand), fetchOrders(token)]);
       setCatalog(nextCatalog);
       setOrders(nextOrders);
+      loaded.current = true;
       setError(null);
     } catch (cause) {
-      if (cause instanceof ApiError && cause.status === 401) expire();
+      if (cause instanceof ApiError && cause.status === 401) expire(token);
       setError(cause instanceof Error ? cause.message : 'Could not load Store orders.');
-    } finally { setLoading(false); }
+    } finally { refreshing.current = false; setLoading(false); }
   }, [token, expire]);
 
   useEffect(() => {
@@ -86,7 +94,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
     updateOrder(order.id, { status: 'receipt_confirmed', events: { ...order.events, receipt_confirmed: new Date().toLocaleTimeString('en-LK', { timeZone: 'Asia/Colombo', hour: '2-digit', minute: '2-digit' }) } });
   }, [token, refresh, updateOrder]);
 
-  const value = useMemo(() => ({ orders, catalog, live, loading, error, getOrder, addOrder, confirmReceipt, updateOrder, refresh }), [orders, catalog, loading, error, getOrder, addOrder, confirmReceipt, updateOrder, refresh]);
+  const value = useMemo(() => ({ orders, store, catalog, live, loading, error, getOrder, addOrder, confirmReceipt, updateOrder, refresh }), [orders, store, catalog, loading, error, getOrder, addOrder, confirmReceipt, updateOrder, refresh]);
   return <OrdersContext.Provider value={value}>{children}</OrdersContext.Provider>;
 }
 

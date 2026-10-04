@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { XIcon } from 'lucide-react';
 import type { Brand, OrderStatus } from '../types/orders';
@@ -13,7 +13,7 @@ const selectClass =
 'h-10 w-full rounded-full border border-line bg-surface px-4 text-base font-medium text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 sm:w-48 lg:text-sm';
 
 export function OrderHistory() {
-  const { orders, live, loading, error } = useOrders();
+  const { orders, store, live, loading, error } = useOrders();
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') ?? '';
   const [status, setStatus] = useState<'all' | OrderStatus>('all');
@@ -31,14 +31,14 @@ export function OrderHistory() {
     <PageContainer>
       <PageHeader
         title="Order History"
-        subtitle={`All orders for ${live ? 'your outlet' : OUTLET_NAME} · ${filtered.length} shown`} />
+        subtitle={`All orders for ${live ? (store?.outletName ?? 'your outlet') : OUTLET_NAME} · ${filtered.length} shown`} />
       {live && loading && <p role="status" className="mt-4 text-sm text-subtle">Loading order history…</p>}
       {live && error && <p role="alert" className="mt-4 text-sm text-danger-ink">{error}</p>}
       
       <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-end">
         <label className="block">
           <span className="text-sm text-subtle">Status</span>
-          <select value={status} onChange={(e) => setStatus(e.target.value as 'all' | OrderStatus)} className={`${selectClass} mt-1`}>
+          <select aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value as 'all' | OrderStatus)} className={`${selectClass} mt-1`}>
             <option value="all">All statuses</option>
             {(Object.keys(STATUS_CONFIG) as OrderStatus[]).map((s) =>
             <option key={s} value={s}>
@@ -49,7 +49,7 @@ export function OrderHistory() {
         </label>
         <label className="block">
           <span className="text-sm text-subtle">Brand</span>
-          <select value={brand} onChange={(e) => setBrand(e.target.value as 'all' | Brand)} className={`${selectClass} mt-1`}>
+          <select aria-label="Brand" value={brand} onChange={(e) => setBrand(e.target.value as 'all' | Brand)} className={`${selectClass} mt-1`}>
             <option value="all">All brands</option>
             <option value="Fresh">Fresh</option>
             <option value="Style">Style</option>

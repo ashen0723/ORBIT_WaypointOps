@@ -27,7 +27,7 @@ export function nextOrderId(orders: Order[]): string {
 }
 
 export function orderAction(order: Order): {label: string;to: string;} | null {
-  if (order.status === 'delivered') return { label: 'Confirm receipt', to: `/orders/${order.id}/receipt` };
+  if (order.deliveryId && !order.receiptConfirmed) return { label: 'Confirm receipt', to: `/orders/${order.id}/receipt` };
   if (order.status === 'deferred') return { label: 'View notice', to: `/orders/${order.id}/deferral` };
   if (order.status === 'in_transit') return { label: 'Track', to: `/orders/${order.id}` };
   return null;

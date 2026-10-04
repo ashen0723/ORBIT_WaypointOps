@@ -11,8 +11,8 @@ export type DeliveryStatus =
 export type SyncState = 'Synced' | 'Saved on phone' | 'Needs attention' | 'Pending' | 'Syncing' | 'Failed' | 'Conflict' | 'Demo only';
 export type ConnectionState = 'online' | 'offline' | 'syncing';
 export type DeliveryOutcome = 'full' | 'partial' | 'failed';
-export type AccessType = 'normal' | 'van_only' | 'mall_dock';
-export type UnloadingMethod = 'rear dock' | 'street' | 'mall loading bay';
+export type AccessType = 'normal' | 'van_only' | 'mall_dock' | 'unknown';
+export type UnloadingMethod = 'rear dock' | 'street' | 'mall loading bay' | 'Confirm unloading with dispatch';
 
 export interface DriverItem {
   id: string;

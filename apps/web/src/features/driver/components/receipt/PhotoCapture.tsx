@@ -1,4 +1,4 @@
-import React, { ChangeEvent, useRef } from 'react';
+import { ChangeEvent, useRef } from 'react';
 import { CameraIcon, UploadIcon, XIcon } from 'lucide-react';
 import type { PhotoAttachment } from '../../types/receipt';
 import { buttonStyles } from '../ui/Button';

@@ -10,7 +10,7 @@ export type OrderStatus =
 'receipt_confirmed' |
 'deferred';
 export type TimelineStep = Exclude<OrderStatus, 'deferred'>;
-export type Unit = 'cases' | 'units' | 'crates';
+export type Unit = string;
 
 export interface OrderItem {
   id: string;
@@ -58,6 +58,7 @@ export interface Order {
   vehicle?: VehicleInfo;
   pod?: ProofOfDelivery;
   events?: Partial<Record<TimelineStep, string>>;
+  deliveryError?: string;
   deliveryId?: string;
   deliveryVersion?: number;
   receiptConfirmed?: boolean;

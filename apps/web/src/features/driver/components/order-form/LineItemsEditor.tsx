@@ -1,4 +1,3 @@
-import React from 'react';
 import { PlusIcon, Trash2Icon } from 'lucide-react';
 import type { CatalogItem, LineDraft, Unit } from '../../types/orders';
 import { Button } from '../ui/Button';

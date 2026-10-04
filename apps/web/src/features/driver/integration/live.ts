@@ -52,6 +52,7 @@ export class LiveDriverIntegration implements DriverIntegration {
   private queue: QueueEntry[] = [];
   private lastSyncedAt = 'Not yet synced';
   private syncing = false;
+  private refreshError: string | undefined;
   private inflight: Promise<void> | null = null;
   private again = false;
   private listeners = new Set<() => void>();
@@ -81,7 +82,7 @@ export class LiveDriverIntegration implements DriverIntegration {
     this.ready = (async () => {
       await this.loadCache().catch(() => undefined);
       const first = this.online() ? this.sync() : Promise.resolve();
-      if (!this.trips.length) await first;
+      await first;
     })();
     return () => {
       window.removeEventListener('online', onOnline);
@@ -135,7 +136,7 @@ export class LiveDriverIntegration implements DriverIntegration {
 
   async retryAction(id: string) {
     const entry = this.queue.find(q => q.id === id);
-    if (!entry) return;
+    if (!entry || entry.status === 'CONFLICT') return;
     await enqueue({ ...entry, status: 'PENDING_SYNC', message: undefined });
     await this.reloadQueue();
     await this.sync();
@@ -143,6 +144,7 @@ export class LiveDriverIntegration implements DriverIntegration {
 
   /** The server keeps the conflicting facts for Dispatcher review, so the phone can drop its copy. */
   async acknowledgeConflict(id: string) {
+    if (!this.queue.some(entry => entry.id === id && entry.status === 'CONFLICT')) return;
     await removeAction(id);
     await this.reloadQueue();
     if (this.online()) await this.refresh();
@@ -190,13 +192,20 @@ export class LiveDriverIntegration implements DriverIntegration {
   async refresh(): Promise<boolean> {
     if (!this.online()) return false;
     try {
-      const page = await this.api<{ items: TripView[] }>('/driver/trips?limit=100');
-      const trips = [...page.items].sort((a, b) => a.date.localeCompare(b.date) || a.tripNo - b.tripNo);
+      const items: TripView[] = [];
+      let cursor: string | null = null;
+      do {
+        const page: { items: TripView[]; nextCursor: string | null } = await this.api(`/driver/trips?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
+        items.push(...page.items);
+        cursor = page.nextCursor;
+      } while (cursor);
+      const trips = items.sort((a, b) => a.date.localeCompare(b.date) || a.tripNo - b.tripNo);
       const missing = [...new Set(trips.flatMap(t => t.stops.map(s => s.orderId)))].filter(id => !this.orders[id]);
       const fetched = await Promise.all(missing.map(id => this.api<OrderView>(`/orders/${encodeURIComponent(id)}`).catch(() => null)));
       for (const order of fetched) if (order) this.orders[order.id] = order;
       this.profile = await this.api<DriverProfile>(`/users/driver/${encodeURIComponent(this.deps.user.id)}/profile`).catch(() => this.profile);
       this.trips = trips;
+      this.refreshError = undefined;
       this.lastSyncedAt = new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Colombo', hour: '2-digit', minute: '2-digit', hour12: false });
       await Promise.all([
         saveTrips(this.deps.user.id, trips),
@@ -208,6 +217,8 @@ export class LiveDriverIntegration implements DriverIntegration {
       return true;
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) this.deps.onUnauthorized?.();
+      this.refreshError = error instanceof Error ? error.message : 'Could not refresh the route. Retry when connected.';
+      this.emit();
       return false;
     }
   }
@@ -322,7 +333,7 @@ export class LiveDriverIntegration implements DriverIntegration {
       vehicle: vehicle?.id ?? 'No vehicle assigned', vehicleType: vehicle ? `${vehicle.type.toLowerCase()} · ${vehicle.temp.toLowerCase()}` : '',
       depot: district, date: '',
     };
-    return { assignment, trips, stopRecords, departedTrips, actions, lastSyncedAt: this.lastSyncedAt };
+    return { assignment, trips, stopRecords, departedTrips, actions, lastSyncedAt: this.lastSyncedAt, refreshError: this.refreshError };
   }
 }
 

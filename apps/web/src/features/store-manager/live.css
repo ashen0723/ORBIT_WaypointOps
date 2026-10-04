@@ -1,0 +1,9 @@
+.store-manager-shell { --store-forest: #205438; }
+.store-manager-shell .bg-forest { background-color: var(--store-forest); }
+.store-manager-shell .from-forest { --tw-gradient-from: #205438 var(--tw-gradient-from-position); }
+.store-manager-shell .to-brand { --tw-gradient-to: #2e7046 var(--tw-gradient-to-position); }
+.store-manager-shell .bg-canvas { background-color: #eef0ed; }
+.store-manager-shell .text-forest { color: var(--store-forest); }
+.store-manager-shell h1, .store-manager-shell dd { overflow-wrap: anywhere; }
+@media (min-width: 1024px) { .store-manager-shell > aside { width: 248px; } }
+@media (max-width: 767px) { .store-manager-shell main { overflow-x: hidden; } }

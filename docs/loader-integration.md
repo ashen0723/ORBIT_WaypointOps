@@ -61,3 +61,11 @@ PostgreSQL/Chromium checks cover publication to Loader, start/check/plan acknowl
 photo bytes persisted, blocked readiness, Dispatcher replacement, Loader acknowledgement,
 completed-load navigation, mobile overflow and the full Driver/receipt/offline lifecycle.
 Legacy DTO mapper unit tests are source-reference tests, not evidence of live API compatibility.
+
+## Reference UI restoration
+
+The live Loader now uses the supplied `ORBIT_WaypointOps (2).zip` layout: a rounded sidebar and top bar, queue metric cards and status tabs, completed/issue empty states, and the account Settings page. The ZIP's Settings, logo, and small presentation components are reused; the shell is adapted to the mounted router and live session. Styles are scoped to the Loader workspace.
+
+The queue retains the run-date selector, paginated depot-scoped API reads, search, refresh, loading/error states and stale-write protection. Summary counts and status tabs derive from server loading records. Issues includes resolved history as well as unresolved exceptions. Trip cards keep the existing quantity, photo evidence, Dispatcher-decision acknowledgment, plan acknowledgment, and ready-for-departure forms. The notification bell shows unresolved issues in the loaded view; the mobile-app card provides installation instructions instead of simulating a sent download link.
+
+Browser coverage captures all four desktop screens, checks mobile navigation and overflow, and exercises the live Loader issue/replacement/ready lifecycle in the existing four-role integration scenario.

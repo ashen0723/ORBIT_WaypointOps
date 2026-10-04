@@ -1,4 +1,3 @@
-import React from 'react';
 import { useOrders } from '../contexts/OrdersContext';
 import { PageContainer } from '../components/ui/PageContainer';
 import { PageHeader } from '../components/ui/PageHeader';

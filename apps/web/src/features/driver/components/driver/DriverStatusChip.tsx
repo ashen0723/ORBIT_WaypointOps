@@ -1,4 +1,3 @@
-import React from 'react';
 import type { DeliveryStatus } from '../../types/driver';
 
 const STATUS_STYLES: Record<DeliveryStatus, string> = {

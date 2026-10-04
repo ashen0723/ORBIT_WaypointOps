@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { PlusIcon, XIcon } from 'lucide-react';
 import type { Brand, OrderStatus } from '../types/orders';

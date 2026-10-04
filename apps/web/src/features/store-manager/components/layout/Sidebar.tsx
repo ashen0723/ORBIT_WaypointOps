@@ -1,4 +1,3 @@
-import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { LogOutIcon } from 'lucide-react';
 import { Logo } from './Logo';

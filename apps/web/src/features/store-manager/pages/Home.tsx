@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import { PlusIcon } from 'lucide-react';
 import { useOrders } from '../contexts/OrdersContext';
@@ -12,10 +11,10 @@ import { formatDateLong } from '../utils/format';
 import { todayColombo } from '../api/storeApi';
 
 export function Home() {
-  const { orders, live, loading, error } = useOrders();
+  const { orders, store, live, loading, error } = useOrders();
   const today = live ? todayColombo() : TODAY;
   const weekStart = live ? todayColombo(new Date(Date.now() - 7 * 86400000)) : WEEK_START;
-  const current = orders.filter((o) => o.requestedDate >= today || o.status === 'delivered' || o.status === 'deferred');
+  const current = orders.filter((o) => o.requestedDate >= today || !['receipt_confirmed'].includes(o.status));
 
   const stats = [
   {
@@ -44,7 +43,7 @@ export function Home() {
     <PageContainer className="pb-32 md:pb-8">
       <PageHeader
         title="My Orders"
-        subtitle={`${live ? 'Your outlet' : OUTLET_NAME} · ${formatDateLong(today)}`}
+        subtitle={`${live ? (store?.outletName ?? 'Your outlet') : OUTLET_NAME} · ${formatDateLong(today)}`}
         actions={
         <Link to="/place-order" className={`${buttonStyles('primary', 'lg')} hidden md:inline-flex`}>
             <PlusIcon aria-hidden="true" className="h-5 w-5" />

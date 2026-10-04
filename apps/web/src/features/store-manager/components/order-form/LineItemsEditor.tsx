@@ -1,4 +1,3 @@
-import React from 'react';
 import { PlusIcon, Trash2Icon } from 'lucide-react';
 import type { CatalogItem, LineDraft, Unit } from '../../types/orders';
 import { Button } from '../ui/Button';
@@ -82,7 +81,7 @@ export function LineItemsEditor({ lines, onChange, suggestions, listId, showErro
                     onChange={(e) => update(line.id, { unit: e.target.value as Unit })}
                     className={`${field} border-line`}>
                     
-                    {UNITS.map((u) =>
+                    {[...new Set([...UNITS, ...suggestions.map(item => item.unit), line.unit])].map((u) =>
                     <option key={u} value={u}>
                         {u[0].toUpperCase() + u.slice(1)}
                       </option>
@@ -152,7 +151,7 @@ export function LineItemsEditor({ lines, onChange, suggestions, listId, showErro
                     onChange={(e) => update(line.id, { unit: e.target.value as Unit })}
                     className={`${field} mt-1 border-line`}>
                     
-                    {UNITS.map((u) =>
+                    {[...new Set([...UNITS, ...suggestions.map(item => item.unit), line.unit])].map((u) =>
                     <option key={u} value={u}>
                         {u[0].toUpperCase() + u.slice(1)}
                       </option>

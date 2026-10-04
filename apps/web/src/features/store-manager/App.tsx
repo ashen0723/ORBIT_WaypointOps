@@ -1,4 +1,4 @@
-import React from 'react';
+import './live.css';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { OrdersProvider } from './contexts/OrdersContext';

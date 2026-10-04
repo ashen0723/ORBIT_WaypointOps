@@ -145,10 +145,58 @@ module.exports = async ({ db, base }) => {
       }
       await page.getByLabel("Password", { exact: true }).fill("test-password");
       await page.getByRole("button", { name: "Sign in", exact: true }).click();
-      await expect(
-        page.getByRole("button", { name: "Sign out" }),
-      ).toBeVisible();
-      if (role !== "store")
+      if (role === "driver")
+        await expect(
+          page.getByRole("heading", {
+            name: "Today's trips",
+            exact: true,
+            level: 1,
+          }),
+        ).toBeVisible();
+      else
+        await expect(
+          page.getByRole("button", {
+            name: role === "loader" ? "Log out" : "Sign out",
+          }),
+        ).toBeVisible();
+      if (role === "loader") {
+        await page.setViewportSize({ width: 1600, height: 900 });
+        for (const [route, title] of [
+          ["", "Loading Queue"],
+          ["issues", "Loading Issues"],
+          ["completed", "Completed Loads"],
+          ["settings", "Settings"],
+        ]) {
+          await page.goto(`${url}/loader/${route}`);
+          await expect(
+            page.getByRole("heading", { name: title, exact: true }),
+          ).toBeVisible();
+          await expect(page.getByText("Refreshing loading work…")).toHaveCount(
+            0,
+          );
+          await page.screenshot({
+            path: `/private/tmp/waypoint-loader-${route || "queue"}-desktop.png`,
+            fullPage: true,
+          });
+        }
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page
+          .getByRole("button", { name: "Open menu", exact: true })
+          .click();
+        await page
+          .getByRole("link", { name: "Loading queue", exact: true })
+          .click();
+        await expect(
+          page.getByRole("heading", { name: "Loading Queue", exact: true }),
+        ).toBeVisible();
+        assert.ok(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth + 1,
+          ),
+        );
+        await page.setViewportSize({ width: 1280, height: 900 });
+      }
+      if (role !== "store" && role !== "driver")
         await page.getByLabel("Run date", { exact: true }).fill(day);
     }
     const store = pages.store;
@@ -249,7 +297,7 @@ module.exports = async ({ db, base }) => {
     ).toBeVisible();
     await loader.getByRole("link", { name: "Issues", exact: true }).click();
     await expect(
-      loader.getByRole("heading", { name: "Loading issues", exact: true }),
+      loader.getByRole("heading", { name: "Loading Issues", exact: true }),
     ).toBeVisible();
     await loader
       .getByText("Issue history and evidence", { exact: true })
@@ -352,7 +400,7 @@ module.exports = async ({ db, base }) => {
       .getByRole("link", { name: "Completed loads", exact: true })
       .click();
     await expect(
-      loader.getByRole("heading", { name: "Completed loads", exact: true }),
+      loader.getByRole("heading", { name: "Completed Loads", exact: true }),
     ).toBeVisible();
     await loader.getByRole("link", { name: "Open trip", exact: true }).click();
     await loader
@@ -370,9 +418,20 @@ module.exports = async ({ db, base }) => {
     );
     await loader.setViewportSize({ width: 1280, height: 900 });
     const driver = pages.driver;
-    await driver.getByRole("button", { name: "Refresh", exact: true }).click();
-    await driver.getByRole("button", { name: "Depart", exact: true }).click();
-    await expect(driver.getByText(/Trip 1 · IN_TRANSIT/)).toBeVisible();
+    await driver
+      .getByRole("button", { name: "Refresh route / sync", exact: true })
+      .click();
+    await driver.goto(`${url}/driver/trips/${loadingTrip.id}/check`);
+    await driver
+      .getByRole("button", { name: "Depart — start trip", exact: true })
+      .click();
+    await driver.goto(`${url}/driver/trips/${loadingTrip.id}/stops/1`);
+    await driver
+      .getByRole("button", { name: "I've arrived", exact: true })
+      .click();
+    await expect(
+      driver.getByRole("button", { name: "Record delivery", exact: true }),
+    ).toBeVisible();
     await driver.evaluate(async () => {
       await navigator.serviceWorker.ready;
       if (!navigator.serviceWorker.controller)
@@ -383,35 +442,53 @@ module.exports = async ({ db, base }) => {
         );
     });
     await driver.context().setOffline(true);
-    await driver.getByText("Record delivery outcome", { exact: true }).click();
-    await driver.getByLabel("Recipient name").fill("Browser receiver");
-    await driver.getByLabel("Receiver signature image").setInputFiles({
-      name: "signature.png",
-      mimeType: "image/png",
-      buffer: Buffer.from(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a1f8AAAAASUVORK5CYII=",
-        "base64",
-      ),
-    });
     await driver
-      .getByRole("button", { name: "Save delivery evidence" })
+      .getByRole("button", { name: "Record delivery", exact: true })
       .click();
-    await expect(
-      driver.getByText("OUTCOME · PENDING_SYNC", { exact: false }),
-    ).toBeVisible();
+    await driver.getByLabel("Recipient name").fill("Browser receiver");
+    const signature = driver.getByRole("img", {
+      name: "Signature pad. Draw with your finger.",
+    });
+    const box = await signature.boundingBox();
+    assert.ok(box);
+    await driver.mouse.move(box.x + 25, box.y + 40);
+    await driver.mouse.down();
+    await driver.mouse.move(box.x + 120, box.y + 70, { steps: 8 });
+    await driver.mouse.up();
+    await driver
+      .getByRole("button", { name: "Complete delivery", exact: true })
+      .click();
+    await expect(driver.getByText(/outcome · Saved on phone/)).toBeVisible();
     await driver.reload();
-    await expect(
-      driver.getByText("OUTCOME · PENDING_SYNC", { exact: false }),
-    ).toBeVisible();
+    await expect(driver.getByText(/outcome · Saved on phone/)).toBeVisible();
     assert.equal(
       await db.delivery.count({ where: { stop: { orderId: order.id } } }),
       0,
     );
     await driver.context().setOffline(false);
-    await driver.getByRole("button", { name: "Sync pending actions" }).click();
+    await driver
+      .getByRole("button", { name: "Refresh route / sync", exact: true })
+      .click();
+    await expect
+      .poll(
+        () => db.delivery.count({ where: { stop: { orderId: order.id } } }),
+        { timeout: 15000 },
+      )
+      .toBe(1);
     await expect(
-      driver.getByText("OUTCOME · SYNCED", { exact: false }),
-    ).toBeVisible({ timeout: 15000 });
+      driver.getByRole("region", { name: "Synchronization" }),
+    ).toHaveCount(0);
+    await driver.setViewportSize({ width: 390, height: 844 });
+    assert.ok(
+      await driver.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth + 1,
+      ),
+    );
+    await driver.screenshot({
+      path: "/private/tmp/waypoint-driver-mobile.png",
+      fullPage: true,
+    });
+    await driver.setViewportSize({ width: 1280, height: 900 });
     await store.getByRole("button", { name: "Refresh", exact: true }).click();
     const card = store
       .locator("section")

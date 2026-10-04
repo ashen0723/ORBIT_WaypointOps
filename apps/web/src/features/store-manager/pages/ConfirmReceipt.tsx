@@ -1,4 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { apiFetch } from '../../../api/client';
+import { useAuth } from '../../../app/providers/AuthProvider';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Loader2Icon, TriangleAlertIcon } from 'lucide-react';
@@ -22,6 +24,7 @@ const emptyCheck = (): ItemCheck => ({ result: null, issueType: null, descriptio
 export function ConfirmReceipt() {
   const { orderId } = useParams();
   const navigate = useNavigate();
+  const { token } = useAuth();
   const { getOrder, confirmReceipt, live, loading } = useOrders();
   const actionId = useRef<string | null>(null);
   const order = getOrder(orderId);
@@ -37,7 +40,7 @@ export function ConfirmReceipt() {
 
   if (!order) return loading ? <PageContainer><p role="status">Loading order…</p></PageContainer> : <OrderNotFound />;
 
-  if (order.status !== 'delivered' || order.receiptConfirmed) {
+  if ((!order.deliveryId && live) || (!live && order.status !== 'delivered') || order.receiptConfirmed) {
     const confirmed = order.status === 'receipt_confirmed' || order.receiptConfirmed;
     return (
       <PageContainer>
@@ -78,17 +81,24 @@ export function ConfirmReceipt() {
     setSubmitting(true);
     try {
       actionId.current ??= crypto.randomUUID();
-      const receiptLines: ReceiptQuantityLine[] = items.map(item => {
+      const receiptLines: ReceiptQuantityLine[] = await Promise.all(items.map(async item => {
         const check = checks[item.id];
+        const photoRefs: string[] = [];
+        if (live && check.result === 'issue') for (const photo of check.photos) {
+          if (!photo.file) continue;
+          const body = new FormData(); body.set('file', photo.file); body.set('orderId', order.id); body.set('clientActionId', photo.id);
+          const saved = await apiFetch<{ evidenceId: string }>('/evidence', { method: 'POST', token, body });
+          photoRefs.push(saved.evidenceId);
+        }
         return {
           orderLineId: item.id,
           acceptedQty: check.result === 'ok' ? (item.deliveredQty ?? item.qty) : Number(check.acceptedQty),
           damagedQty: check.result === 'ok' ? 0 : Number(check.damagedQty),
           missingQty: check.result === 'ok' ? 0 : Number(check.missingQty),
           note: check.result === 'issue' ? check.description.trim() : null,
-          photoRefs: [],
+          photoRefs,
         };
-      });
+      }));
       await confirmReceipt(order, receiptLines, actionId.current);
       actionId.current = null;
       toast.success('Receipt confirmed', {

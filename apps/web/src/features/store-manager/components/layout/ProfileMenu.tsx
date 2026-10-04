@@ -1,11 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useAuth } from '../../../../app/providers/AuthProvider';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { LogOutIcon, UserIcon } from 'lucide-react';
 import { Avatar } from '../ui/Avatar';
-import { MANAGER } from '../../data/schedule';
+
 
 export function ProfileMenu({ onSignOut }: {onSignOut: () => void;}) {
+  const { user } = useAuth();
+  const MANAGER = { name: user?.name ?? 'Store Manager', email: user?.email ?? '', avatar: undefined };
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 

@@ -1,4 +1,3 @@
-import React from 'react';
 import { WifiIcon, WifiOffIcon } from 'lucide-react';
 import type { ConnectionState } from '../../types/driver';
 

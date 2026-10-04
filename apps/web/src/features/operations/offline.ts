@@ -168,7 +168,7 @@ export function flushQueue(actorId: string, token: string): Promise<void> {
         // A 4xx (e.g. rejected evidence bytes) will fail identically on every retry: keep the entry, mark it
         // FAILED so the driver sees it and can retry deliberately, and block later actions for the same target.
         const status = (e as { status?: number }).status;
-        if (status && status >= 400 && status < 500 && status !== 408 && status !== 429) {
+        if (status && status >= 400 && status < 500 && status !== 401 && status !== 408 && status !== 429) {
           entry.status = "FAILED";
           await enqueue(entry);
           blocked.add(target);

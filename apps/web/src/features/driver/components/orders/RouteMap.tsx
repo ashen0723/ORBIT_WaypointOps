@@ -1,4 +1,3 @@
-import React from 'react';
 import { TruckIcon } from 'lucide-react';
 import type { Order } from '../../types/orders';
 import { Card } from '../ui/Card';

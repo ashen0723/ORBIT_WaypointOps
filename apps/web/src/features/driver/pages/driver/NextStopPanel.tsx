@@ -1,4 +1,3 @@
-import React from 'react';
 import { ArrowRightIcon, CheckCircle2Icon } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';

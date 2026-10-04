@@ -1,4 +1,3 @@
-import React from 'react';
 import { PauseIcon, PlayIcon } from 'lucide-react';
 import { useDriver } from '../../contexts/DriverContext';
 import { useSyncQueue } from '../../hooks/useSyncQueue';

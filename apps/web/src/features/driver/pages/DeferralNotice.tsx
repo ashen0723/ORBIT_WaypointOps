@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ArrowRightIcon, CircleCheckIcon, ClockIcon, Loader2Icon, TriangleAlertIcon } from 'lucide-react';

@@ -13,7 +13,7 @@ import { SidebarStatusCard } from './SidebarStatusCard';
 const NOTIFICATION_COUNT = 1;
 
 export function DriverShell() {
-  const { identity: DRIVER, connection, demoMode, actions, error, retryAction, acknowledgeConflict } = useDriver();
+  const { identity: DRIVER, connection, demoMode, actions, error, refreshError, sync, retryAction, acknowledgeConflict } = useDriver();
   const location = useLocation();
   const [language, setLanguage] = useState('EN');
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -69,7 +69,9 @@ export function DriverShell() {
             </div>
             {demoMode && <div role="status" className="mb-4 rounded-card bg-amber-pale p-4 text-sm text-amber-ink">Demo route and vehicle — no backend or persistent queue connected. Actions stay in memory and are lost on refresh.</div>}
             {error && <p role="alert" className="mb-4 text-danger-ink">{error}</p>}
-            {actions.length > 0 && <section aria-label="Synchronization" className="mb-4 space-y-3">{actions.map(action => <div key={action.id} className="rounded-card border border-line p-4 text-sm break-words"><p>{action.tripId}{action.sequence !== undefined ? ` · Stop ${action.sequence}` : ''} · {action.kind} · {action.state}</p>{action.message && <p>{action.message}</p>}{['Failed', 'Conflict', 'Needs attention'].includes(action.state) && <button className="min-h-12 underline" onClick={() => retryAction(action.id)}>Retry action</button>}{action.state === 'Conflict' && <button className="ml-3 min-h-12 underline" onClick={() => acknowledgeConflict(action.id)}>Acknowledge review</button>}</div>)}</section>}
+            <button className="mb-4 min-h-12 underline" onClick={() => void sync()}>Refresh route / sync</button>
+            {refreshError && <p role="alert">Route refresh failed: {refreshError}. Cached data may be outdated.</p>}
+            {actions.length > 0 && <section aria-label="Synchronization" className="mb-4 space-y-3">{actions.map(action => <div key={action.id} className="rounded-card border border-line p-4 text-sm break-words"><p>{action.tripId}{action.sequence !== undefined ? ` · Stop ${action.sequence}` : ''} · {action.kind} · {action.state}</p>{action.message && <p>{action.message}</p>}{['Failed', 'Pending', 'Saved on phone', 'Needs attention'].includes(action.state) && <button className="min-h-12 underline" onClick={() => retryAction(action.id)}>Retry action</button>}{action.state === 'Conflict' && <button className="ml-3 min-h-12 underline" onClick={() => acknowledgeConflict(action.id)}>Dismiss local copy — sent to dispatcher</button>}</div>)}</section>}
             <Outlet />
           </div>
         </main>

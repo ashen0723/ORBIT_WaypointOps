@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import { CarrotIcon, PlusIcon, ShirtIcon, TvIcon } from 'lucide-react';
 import type { Brand } from '../../types/orders';

@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import { useAuth } from '../../../../app/providers/AuthProvider';
+import { useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { LogOutIcon, UserIcon, XIcon } from 'lucide-react';
@@ -6,7 +7,7 @@ import { Logo } from './Logo';
 import { AppPromoCard } from './AppPromoCard';
 import { Avatar } from '../ui/Avatar';
 import { generalNav, menuNav } from '../../data/navigation';
-import { MANAGER, OUTLET_NAME } from '../../data/schedule';
+import { useOrders } from '../../contexts/OrdersContext';
 
 interface MobileDrawerProps {
   open: boolean;
@@ -17,6 +18,10 @@ interface MobileDrawerProps {
 const EASE = [0.23, 1, 0.32, 1] as const;
 
 export function MobileDrawer({ open, onClose, onSignOut }: MobileDrawerProps) {
+  const { user } = useAuth();
+  const MANAGER = { name: user?.name ?? 'Store Manager', email: user?.email ?? '', avatar: undefined };
+  const { store } = useOrders();
+  const OUTLET_NAME = store?.outletName ?? 'Your outlet';
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {

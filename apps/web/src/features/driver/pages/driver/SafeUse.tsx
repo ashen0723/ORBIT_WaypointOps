@@ -1,4 +1,3 @@
-import React from 'react';
 import { ArrowLeftIcon, ShieldAlertIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
