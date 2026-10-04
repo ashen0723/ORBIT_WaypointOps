@@ -1,6 +1,8 @@
 import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { StoreAuthGuard, StoreRequest } from './store-auth.guard';
+import { catalog } from './catalog';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Controller('orders')
 @UseGuards(StoreAuthGuard)
@@ -26,5 +28,17 @@ export class StoreOrdersController {
   @Get()
   list(@Req() request: StoreRequest) {
     return this.ordersService.list(request.storeUser);
+  }
+}
+
+@Controller('catalog')
+@UseGuards(StoreAuthGuard)
+export class CatalogController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @Get()
+  async list(@Req() request: StoreRequest) {
+    const outlet = await this.prisma.outlet.findUniqueOrThrow({ where: { id: request.storeUser.outletId } });
+    return catalog.filter(item => item.brand === outlet.brand);
   }
 }

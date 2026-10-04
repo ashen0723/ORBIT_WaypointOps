@@ -30,6 +30,7 @@ enum Brand {
 enum TempRequirement {
   AMBIENT
   CHILLED
+  FROZEN
 }
 
 enum VehicleType {
@@ -196,6 +197,9 @@ model Vehicle {
 
 model Order {
   id             String          @id @default(cuid())
+  version        Int             @default(1)
+  clientActionId String?         @unique
+  requestHash    String?
   outletId       String
   requestedDate  DateTime        @db.Date
   plannedDate    DateTime?       @db.Date
@@ -204,6 +208,8 @@ model Order {
   weightKg       Float
   volumeM3       Float
   status         OrderStatus     @default(CONFIRMED)
+  activeTripId   String?
+  recoveryPending Boolean       @default(false)
   deferralCount  Int             @default(0)
   deferReason    String?
   deferredToDate DateTime?       @db.Date
@@ -214,7 +220,7 @@ model Order {
   outlet    Outlet      @relation(fields: [outletId], references: [id])
   createdBy User        @relation("OrderCreatedBy", fields: [createdById], references: [id])
   lines     OrderLine[]
-  stop      TripStop?
+  stops     TripStop[]
 
   @@index([outletId, requestedDate])
   @@index([status])
@@ -226,14 +232,17 @@ model OrderLine {
   item         String
   unit         String
   requestedQty Int
+  cancelledQty Int      @default(0)
   loadedQty    Int?
-  deliveredQty Int?
+  deliveredQty Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   order         Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
   loadingIssues LoadingIssue[]
   receiptIssues ReceiptIssue[]
+  deliveryLines DeliveryLine[]
+  receiptLines ReceiptLine[]
 }
 
 // ─── Planning and trips ─────────────────────────────────────────────────────
@@ -263,7 +272,7 @@ model Trip {
 model TripStop {
   id        String     @id @default(cuid())
   tripId    String
-  orderId   String     @unique // an order belongs to at most one active stop
+  orderId   String // retries preserve previous stops
   sequence  Int
   etaTime   String? // "HH:MM"
   status    StopStatus @default(PLANNED)
@@ -276,6 +285,7 @@ model TripStop {
   delivery Delivery?
 
   @@unique([tripId, sequence])
+  @@index([orderId])
 }
 
 // ─── Loading ────────────────────────────────────────────────────────────────
@@ -316,6 +326,7 @@ model LoadingIssue {
 
 model Delivery {
   id             String     @id @default(cuid())
+  version        Int        @default(1)
   stopId         String     @unique
   outcome        StopStatus
   reason         String?
@@ -328,6 +339,20 @@ model Delivery {
   stop    TripStop         @relation(fields: [stopId], references: [id])
   pod     ProofOfDelivery?
   receipt Receipt?
+  lines   DeliveryLine[]
+}
+
+model DeliveryLine {
+  id           String @id @default(cuid())
+  deliveryId   String
+  orderLineId  String
+  loadedQty    Int
+  deliveredQty Int
+  returnedQty  Int
+  delivery     Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  orderLine    OrderLine @relation(fields: [orderLineId], references: [id])
+
+  @@unique([deliveryId, orderLineId])
 }
 
 model ProofOfDelivery {
@@ -346,6 +371,8 @@ model ProofOfDelivery {
 model Receipt {
   id            String        @id @default(cuid())
   deliveryId    String        @unique
+  clientActionId String?      @unique
+  requestHash   String?
   confirmedById String
   status        ReceiptStatus @default(PENDING)
   confirmedAt   DateTime?
@@ -355,6 +382,22 @@ model Receipt {
   delivery    Delivery       @relation(fields: [deliveryId], references: [id])
   confirmedBy User           @relation(fields: [confirmedById], references: [id])
   issues      ReceiptIssue[]
+  lines       ReceiptLine[]
+}
+
+model ReceiptLine {
+  id           String  @id @default(cuid())
+  receiptId    String
+  orderLineId  String
+  acceptedQty  Int
+  damagedQty   Int
+  missingQty   Int
+  note         String?
+  photoRefs    String[]
+  receipt      Receipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  orderLine    OrderLine @relation(fields: [orderLineId], references: [id])
+
+  @@unique([receiptId, orderLineId])
 }
 
 model ReceiptIssue {

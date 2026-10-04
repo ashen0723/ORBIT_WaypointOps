@@ -4,12 +4,14 @@ import { scheduleOrder } from './operating-day';
 import { OrdersService } from './orders.service';
 import { ReceiptsService } from '../receipts/receipts.service';
 
-describe('Store order rules', () => {
-  it('validates the outlet catalogue and computes server totals', () => {
-    const order = validateOrderInput({ requestedDate: '2026-10-05', type: 'dry', items: [{ name: 'Sourdough loaf', qty: 6, unit: 'crates' }] }, Brand.FRESH);
-    expect(order).toMatchObject({ units: 6, weightKg: 38.4, volumeM3: 0.24 });
-    expect(() => validateOrderInput({ requestedDate: '2026-02-30', type: 'dry', items: [{ name: 'Sourdough loaf', qty: 1, unit: 'crates' }] }, Brand.FRESH)).toThrow();
-    expect(() => validateOrderInput({ outletId: 'OUT002', requestedDate: '2026-10-05', type: 'dry', items: [{ name: 'Sourdough loaf', qty: 1, unit: 'crates' }] }, Brand.FRESH)).toThrow();
+const createInput = { clientActionId: 'action-123456', requestedDate: '2026-10-05', temp: 'AMBIENT', lines: [{ catalogItemId: 'fresh-sourdough-loaf', requestedQty: 6 }] };
+
+describe('Store order contract', () => {
+  it('uses catalogue IDs and computes server totals', () => {
+    expect(validateOrderInput(createInput, Brand.FRESH)).toMatchObject({ units: 6, weightKg: 38.4, volumeM3: 0.24 });
+    expect(() => validateOrderInput({ ...createInput, requestedDate: '2026-02-30' }, Brand.FRESH)).toThrow();
+    expect(() => validateOrderInput({ ...createInput, outletId: 'OUT-002' }, Brand.FRESH)).toThrow();
+    expect(() => validateOrderInput({ ...createInput, lines: [{ catalogItemId: 'style-canvas-tote', requestedQty: 1 }] }, Brand.FRESH)).toThrow();
   });
 
   it('moves a post-cutoff order to the following run', () => {
@@ -17,27 +19,36 @@ describe('Store order rules', () => {
   });
 
   it('does not disclose another outlet order', async () => {
-    const prisma = { order: { findUnique: jest.fn().mockResolvedValue({ id: 'order-1', outletId: 'OUT002' }) } };
-    const service = new OrdersService(prisma as never);
-    await expect(service.findOne({ id: 'user-1', outletId: 'OUT001' }, 'order-1')).rejects.toMatchObject({ status: 403 });
+    const prisma = { order: { findUnique: jest.fn().mockResolvedValue({ id: 'order-1', outletId: 'OUT-002' }) } };
+    await expect(new OrdersService(prisma as never).findOne({ id: 'user-1', outletId: 'OUT-001' }, 'order-1')).rejects.toMatchObject({ status: 403 });
   });
 });
 
-describe('Store receipt rules', () => {
-  const user = { id: 'user-1', outletId: 'OUT001' };
-  it('rejects receipt before delivery is completed', async () => {
-    const prisma = { delivery: { findUnique: jest.fn().mockResolvedValue({
-      id: 'delivery-1', outcome: 'PLANNED', stop: { order: { id: 'order-1', outletId: 'OUT001', status: 'IN_TRANSIT', lines: [] } }, receipt: null,
-    }) } };
-    const service = new ReceiptsService(prisma as never);
-    await expect(service.confirm(user, 'delivery-1')).rejects.toMatchObject({ status: 409 });
+describe('Store receipt contract', () => {
+  const user = { id: 'user-1', outletId: 'OUT-001' };
+  const receiptInput = { clientActionId: 'receipt-123456', expectedDeliveryVersion: 1, lines: [{ orderLineId: 'line-1', acceptedQty: 14, damagedQty: 0, missingQty: 0, note: null, photoRefs: [] }] };
+  const delivery = { id: 'delivery-1', version: 1, outcome: 'PARTIAL', lines: [{ orderLineId: 'line-1', deliveredQty: 14 }], stop: { order: { id: 'order-1', outletId: 'OUT-001', status: 'DELIVERED', recoveryPending: true, lines: [{ requestedQty: 20, cancelledQty: 4, deliveredQty: 14 }] } }, receipt: null };
+
+  it('rejects a version mismatch before saving a receipt', async () => {
+    const prisma = { receipt: { findUnique: jest.fn().mockResolvedValue(null) }, delivery: { findUnique: jest.fn().mockResolvedValue(delivery) }, $transaction: async (callback: (tx: unknown) => Promise<unknown>) => callback(prisma) };
+    await expect(new ReceiptsService(prisma as never).confirm(user, 'delivery-1', { ...receiptInput, expectedDeliveryVersion: 2 })).rejects.toMatchObject({ status: 409 });
   });
 
-  it('rejects an issue tied to another order line', async () => {
-    const prisma = { delivery: { findUnique: jest.fn().mockResolvedValue({
-      id: 'delivery-1', outcome: 'DELIVERED', stop: { order: { id: 'order-1', outletId: 'OUT001', status: 'DELIVERED', lines: [{ id: 'line-1' }] } }, receipt: null,
-    }) } };
-    const service = new ReceiptsService(prisma as never);
-    await expect(service.reportIssues(user, 'delivery-1', { issues: [{ orderLineId: 'other-line', issueType: 'missing' }] })).rejects.toMatchObject({ status: 400 });
+  it('rejects quantities that exceed the Driver handover', async () => {
+    const prisma = { receipt: { findUnique: jest.fn().mockResolvedValue(null) }, delivery: { findUnique: jest.fn().mockResolvedValue(delivery) }, $transaction: async (callback: (tx: unknown) => Promise<unknown>) => callback(prisma) };
+    await expect(new ReceiptsService(prisma as never).confirm(user, 'delivery-1', { ...receiptInput, lines: [{ ...receiptInput.lines[0], missingQty: 2 }] })).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('keeps a partial order open while recovery is pending', async () => {
+    const receipt = { id: 'receipt-1', status: 'CONFIRMED', confirmedAt: new Date(), lines: receiptInput.lines };
+    const prisma = {
+      receipt: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue(receipt) },
+      delivery: { findUnique: jest.fn().mockResolvedValue(delivery) },
+      tripStop: { findMany: jest.fn().mockResolvedValue([{ delivery: { outcome: 'PARTIAL', receipt } }]) },
+      order: { update: jest.fn() }, auditEvent: { create: jest.fn() },
+      $transaction: async (callback: (tx: unknown) => Promise<unknown>) => callback(prisma),
+    };
+    await new ReceiptsService(prisma as never).confirm(user, 'delivery-1', receiptInput);
+    expect(prisma.order.update).not.toHaveBeenCalled();
   });
 });
