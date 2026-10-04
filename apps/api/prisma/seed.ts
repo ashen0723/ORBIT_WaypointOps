@@ -7,7 +7,7 @@
 import { config } from 'dotenv';
 import bcrypt from 'bcrypt';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient, Role, Brand, DockType, ParkingConstraint, VehicleType, VehicleTemp } from '../src/generated/prisma/client';
+import { PrismaClient, Role, Brand, DockType, ParkingConstraint, VehicleType, VehicleTemp, TempRequirement, OrderStatus } from '../src/generated/prisma/client';
 
 config({ path: ['.env', '../../.env'] });
 
@@ -27,6 +27,14 @@ const outlets = [
     id: 'OUT-002', name: 'FreshMart – Colombo 07', brand: Brand.FRESH, district: 'Colombo', depotId: 'DEP-PLG',
     dockType: DockType.REAR_DOCK, parkingConstraint: ParkingConstraint.NORMAL, windowOpenTime: '04:00', windowCloseTime: '10:00',
   },
+  {
+    id: 'OUT-005', name: 'City Style – Colombo 02', brand: Brand.STYLE, district: 'Colombo', depotId: 'DEP-PLG',
+    dockType: DockType.STREET, parkingConstraint: ParkingConstraint.VAN_ONLY, windowOpenTime: '08:00', windowCloseTime: '14:00',
+  },
+  {
+    id: 'OUT-014', name: 'Hill Fresh – Kandy City', brand: Brand.FRESH, district: 'Kandy', depotId: 'DEP-KDY',
+    dockType: DockType.STREET, parkingConstraint: ParkingConstraint.NORMAL, windowOpenTime: '04:30', windowCloseTime: '09:00',
+  },
 ];
 
 const vehicles = [
@@ -34,6 +42,32 @@ const vehicles = [
     id: 'TRK-021', type: VehicleType.TRUCK, temp: VehicleTemp.REEFER, weightCapKg: 1000, volumeCapM3: 18,
     fuelType: 'diesel', kmPerL: 6.25, weeklyFuelQuotaL: 250, depotId: 'DEP-PLG',
   },
+  {
+    id: 'TRK-030', type: VehicleType.TRUCK, temp: VehicleTemp.AMBIENT, weightCapKg: 2000, volumeCapM3: 26,
+    fuelType: 'diesel', kmPerL: 100 / 15, weeklyFuelQuotaL: 280, depotId: 'DEP-PLG', available: true,
+  },
+  {
+    id: 'VAN-012', type: VehicleType.VAN, temp: VehicleTemp.REEFER, weightCapKg: 600, volumeCapM3: 8,
+    fuelType: 'diesel', kmPerL: 100 / 11, weeklyFuelQuotaL: 150, depotId: 'DEP-PLG', available: true,
+  },
+  {
+    id: 'TRK-041', type: VehicleType.TRUCK, temp: VehicleTemp.REEFER, weightCapKg: 1000, volumeCapM3: 18,
+    fuelType: 'diesel', kmPerL: 100 / 18, weeklyFuelQuotaL: 260, depotId: 'DEP-KDY', available: true,
+  },
+  {
+    id: 'TRK-024', type: VehicleType.TRUCK, temp: VehicleTemp.AMBIENT, weightCapKg: 1800, volumeCapM3: 24,
+    fuelType: 'diesel', kmPerL: 100 / 15, weeklyFuelQuotaL: 260, depotId: 'DEP-PLG', available: false,
+  },
+];
+
+// Fixed Monday keeps allocation fixtures deterministic; these are not rolling production orders.
+const allocationDate = new Date('2026-10-05T00:00:00.000Z');
+const orders = [
+  { id: 'ORD-DEMO-CHILLED', outletId: 'OUT-001', temp: TempRequirement.CHILLED, units: 20, weightKg: 160, volumeM3: 2.4 },
+  { id: 'ORD-DEMO-AMBIENT', outletId: 'OUT-002', temp: TempRequirement.AMBIENT, units: 15, weightKg: 90, volumeM3: 1.6 },
+  { id: 'ORD-DEMO-VAN', outletId: 'OUT-005', temp: TempRequirement.CHILLED, units: 18, weightKg: 220, volumeM3: 3.5 },
+  { id: 'ORD-DEMO-WEIGHT', outletId: 'OUT-001', temp: TempRequirement.CHILLED, units: 100, weightKg: 1001, volumeM3: 2 },
+  { id: 'ORD-DEMO-VOLUME', outletId: 'OUT-001', temp: TempRequirement.CHILLED, units: 100, weightKg: 100, volumeM3: 18.1 },
 ];
 
 const users = [
@@ -63,7 +97,21 @@ async function main(): Promise<void> {
     await prisma.user.upsert({ where: { email }, update: { ...data, passwordHash }, create: { ...u, passwordHash } });
   }
 
-  console.log(`Seeded ${depots.length} depots, ${outlets.length} outlets, ${vehicles.length} vehicles, ${users.length} users.`);
+  // Email-based upsert may find an account whose ID differs from the demo ID.
+  const creator = await prisma.user.findUniqueOrThrow({ where: { email: 'dispatcher@waypoint.lk' } });
+  for (const order of orders) {
+    const { id, ...data } = order;
+    await prisma.order.upsert({
+      where: { id },
+      update: data,
+      create: {
+        ...order, createdById: creator.id, requestedDate: allocationDate,
+        plannedDate: allocationDate, status: OrderStatus.CONFIRMED,
+      },
+    });
+  }
+
+  console.log(`Seeded ${depots.length} depots, ${outlets.length} outlets, ${vehicles.length} vehicles, ${users.length} users, ${orders.length} allocation orders.`);
 }
 
 main()
