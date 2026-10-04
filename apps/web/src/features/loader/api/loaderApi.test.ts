@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { mapLoaderTripDetail, mapLoaderTripSummary } from './loaderApi';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { mapLoaderTripDetail, mapLoaderTripSummary, markTripReady } from './loaderApi';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('mapLoaderTripSummary', () => {
   it('maps the backend trip contract to a Loader queue card', () => {
@@ -36,6 +40,48 @@ describe('mapLoaderTripSummary', () => {
       departure: 'Not scheduled', brand: 'Mixed', district: 'No stops',
       status: 'ready_to_load', priority: 'Standard', vehicleType: 'Van', temperature: 'Ambient',
     });
+  });
+
+  it.each([
+    ['READY_TO_LOAD', 'ready_to_load'],
+    ['LOADING', 'loading'],
+    ['AWAITING_DISPATCHER', 'awaiting_dispatcher'],
+    ['READY_TO_DEPART', 'ready_to_depart'],
+  ] as const)('maps backend status %s to %s', (status, expectedStatus) => {
+    expect(mapLoaderTripSummary({
+      tripId: 'TRIP-STATUS', vehicleId: 'TRK-021', tripNo: 3,
+      date: '2026-10-05', plannedDeparture: '05:30', status,
+      tripStatus: 'LOADING', loadingRecordStatus: 'IN_PROGRESS',
+      stopCount: 1, orderCount: 1, openIssueCount: 0,
+      districts: ['Colombo'], brands: ['FRESH'],
+      plannedWeightKg: 100, plannedVolumeM3: 2,
+      vehicle: {
+        type: 'TRUCK', temperature: 'REEFER',
+        weightCapacityKg: 1000, volumeCapacityM3: 18,
+      },
+    }).status).toBe(expectedStatus);
+  });
+});
+
+describe('Loader completion API', () => {
+  it('posts the persisted ready-to-depart action for the selected trip', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      tripId: 'TRIP 1', tripStatus: 'READY', loadingRecordId: 'LOAD-1',
+      loadingStatus: 'COMPLETED', completedAt: '2026-10-05T05:15:00.000Z',
+      alreadyReady: false, shortfalls: [],
+    }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(markTripReady('loader-token', 'TRIP 1')).resolves.toMatchObject({
+      tripStatus: 'READY', loadingStatus: 'COMPLETED',
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/trips/TRIP%201/ready',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ Authorization: 'Bearer loader-token' }),
+      }),
+    );
   });
 });
 

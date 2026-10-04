@@ -38,10 +38,7 @@ export interface LoaderTripView {
 
 interface LoaderContextValue {
   /**
-   * Runtime Loader data.
-   *
-   * This intentionally starts empty. The Loader backend/API will
-   * populate it later through hydrateLoaderData().
+   * Runtime Loader data populated from the authenticated backend API.
    */
   queueLoads: LoadQueueItem[];
   queueLoading: boolean;
@@ -69,11 +66,9 @@ interface LoaderContextValue {
   issueErrors: Record<string, string>;
 
   /**
-   * Temporary compatibility state for pages that have not yet been
-   * migrated. These IDs should eventually be persisted by the backend.
+   * Temporary compatibility state for stop-plan acknowledgement.
    */
   reviewedPlanVehicleIds: string[];
-  handedOffVehicleIds: string[];
 
   hydrateLoaderData: (
     queueLoads: LoadQueueItem[],
@@ -118,10 +113,6 @@ interface LoaderContextValue {
   ) => Promise<void>;
 
   acknowledgePlanUpdate: (
-    id: string,
-  ) => void;
-
-  confirmHandoff: (
     id: string,
   ) => void;
 
@@ -191,11 +182,6 @@ export function LoaderProvider({
   const [
     reviewedPlanVehicleIds,
     setReviewedPlanVehicleIds,
-  ] = useState<string[]>([]);
-
-  const [
-    handedOffVehicleIds,
-    setHandedOffVehicleIds,
   ] = useState<string[]>([]);
 
   const refreshQueue = useCallback(async () => {
@@ -477,9 +463,6 @@ export function LoaderProvider({
 
     try {
       await markTripReadyRequest(token, tripId);
-      setHandedOffVehicleIds((current) => current.includes(tripId)
-        ? current
-        : [...current, tripId]);
       setQueueLoads((current) => current.map((load) =>
         load.tripId === tripId ? { ...load, status: 'ready_to_depart' } : load,
       ));
@@ -538,7 +521,6 @@ export function LoaderProvider({
         issueSavingItemId,
         issueErrors,
         reviewedPlanVehicleIds,
-        handedOffVehicleIds,
 
         hydrateLoaderData: (
           nextQueueLoads,
@@ -607,7 +589,6 @@ export function LoaderProvider({
           setReviewedPlanVehicleIds(
             [],
           );
-          setHandedOffVehicleIds([]);
         },
 
         setLoadedQuantity: persistLoadedQuantity,
@@ -626,20 +607,6 @@ export function LoaderProvider({
           id,
         ) => {
           setReviewedPlanVehicleIds(
-            (current) =>
-              current.includes(id)
-                ? current
-                : [
-                  ...current,
-                  id,
-                ],
-          );
-        },
-
-        confirmHandoff: (
-          id,
-        ) => {
-          setHandedOffVehicleIds(
             (current) =>
               current.includes(id)
                 ? current
@@ -669,7 +636,6 @@ export function LoaderProvider({
 
       [
         confirmedItemIds,
-        handedOffVehicleIds,
         issues,
         quantities,
         queueLoads,

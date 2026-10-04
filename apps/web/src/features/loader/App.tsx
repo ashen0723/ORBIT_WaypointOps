@@ -128,7 +128,6 @@ function CompletedLoadsIndex() {
     queueLoading,
     queueError,
     refreshQueue,
-    handedOffVehicleIds,
   } = useLoader();
 
   const completedLoads =
@@ -144,10 +143,7 @@ function CompletedLoadsIndex() {
           load.status ===
           'completed' ||
           load.status ===
-          'loading_completed' ||
-          handedOffVehicleIds.includes(
-            load.tripId,
-          )
+          'loading_completed'
         );
       },
     );

@@ -52,7 +52,6 @@ export function CompletedLoad() {
     tripDataById,
     issues,
     quantities,
-    handedOffVehicleIds,
     markTripReady,
     readyingTripId,
     readyErrors,
@@ -192,10 +191,7 @@ export function CompletedLoad() {
 
   const readyRecorded =
     queueItem.status ===
-    'ready_to_depart' ||
-    handedOffVehicleIds.includes(
-      tripId,
-    );
+    'ready_to_depart';
 
   const markingReady =
     readyingTripId === tripId;

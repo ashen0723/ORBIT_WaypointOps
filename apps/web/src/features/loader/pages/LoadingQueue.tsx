@@ -99,7 +99,6 @@ export function LoadingQueue() {
     queueError,
     refreshQueue,
     reviewedPlanVehicleIds,
-    handedOffVehicleIds,
   } = useLoader();
 
   const [
@@ -128,25 +127,6 @@ export function LoadingQueue() {
             const identity =
               load.tripId ??
               load.vehicleId;
-
-            if (
-              handedOffVehicleIds.includes(
-                identity,
-              )
-            ) {
-              return {
-                ...load,
-
-                status:
-                  'loading_completed' as const,
-
-                priority:
-                  'Standard' as const,
-
-                priorityReason:
-                  undefined,
-              };
-            }
 
             if (
               reviewedPlanVehicleIds.includes(
@@ -179,7 +159,6 @@ export function LoadingQueue() {
           },
         ),
       [
-        handedOffVehicleIds,
         queueLoads,
         reviewedPlanVehicleIds,
       ],

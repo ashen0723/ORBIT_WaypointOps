@@ -159,9 +159,7 @@ export interface LoaderIssue extends LoaderIssueTarget {
   photoAttached: boolean;
 
   /**
-   * Legacy prototype field.
-   * Dispatcher decisions must eventually come from backend data
-   * instead of the Loader changing this value locally.
+   * True after the Loader's acknowledgement has been persisted.
    */
   decisionReceived: boolean;
 
