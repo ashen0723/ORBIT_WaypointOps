@@ -23,6 +23,8 @@ conflicts). Shared configs (`tailwind.config.js`, `vite.config.ts`, `tsconfig*.j
 3. **Sign out now really signs out** (was a "Prototype only — sign-in isn't connected" toast):
    `features/store-manager/components/layout/AppShell.tsx`, `features/loader/components/layout/AppShell.tsx`,
    `features/driver/components/layout/AppShell.tsx`, `features/driver/components/driver/DriverNav.tsx`.
+   In the three `AppShell.tsx` files the toast text also changed to plain "Signed out", since the old
+   "Prototype only" description became false (approved by the team).
 
 No bugs were fixed and nothing was deleted.
 
