@@ -7,6 +7,7 @@ import {
   useState,
 } from 'react';
 import type { ReactNode } from 'react';
+import { ApiError } from '../../../api/client';
 
 import type {
   LoadOrder,
@@ -22,9 +23,11 @@ import {
   createLoadingIssue,
   fetchLoaderTrip,
   fetchLoaderTrips,
+  markTripReady as markTripReadyRequest,
   startLoadingTrip as startLoadingTripRequest,
   updateLoadedQuantity,
 } from '../api/loaderApi';
+import type { ReadyTripBlocker } from '../api/loaderApi';
 
 export interface LoaderTripView {
   tripId: string;
@@ -50,6 +53,10 @@ interface LoaderContextValue {
   startLoadingTrip: (tripId: string) => Promise<void>;
   startingTripId: string | null;
   operationErrors: Record<string, string>;
+  readyingTripId: string | null;
+  readyErrors: Record<string, string>;
+  readyBlockers: Record<string, ReadyTripBlocker[]>;
+  markTripReady: (tripId: string) => Promise<void>;
 
   tripDataById: Record<string, LoaderTripView>;
 
@@ -146,6 +153,9 @@ export function LoaderProvider({
   const [tripErrors, setTripErrors] = useState<Record<string, string>>({});
   const [startingTripId, setStartingTripId] = useState<string | null>(null);
   const [operationErrors, setOperationErrors] = useState<Record<string, string>>({});
+  const [readyingTripId, setReadyingTripId] = useState<string | null>(null);
+  const [readyErrors, setReadyErrors] = useState<Record<string, string>>({});
+  const [readyBlockers, setReadyBlockers] = useState<Record<string, ReadyTripBlocker[]>>({});
 
   const [
     tripDataById,
@@ -444,6 +454,64 @@ export function LoaderProvider({
     }
   }, [issues, loadTrip, token]);
 
+  const markTripReady = useCallback(async (tripId: string) => {
+    if (!token) {
+      setReadyErrors((current) => ({
+        ...current,
+        [tripId]: 'Sign in to mark this trip ready.',
+      }));
+      return;
+    }
+
+    setReadyingTripId(tripId);
+    setReadyErrors((current) => {
+      const next = { ...current };
+      delete next[tripId];
+      return next;
+    });
+    setReadyBlockers((current) => {
+      const next = { ...current };
+      delete next[tripId];
+      return next;
+    });
+
+    try {
+      await markTripReadyRequest(token, tripId);
+      setHandedOffVehicleIds((current) => current.includes(tripId)
+        ? current
+        : [...current, tripId]);
+      setQueueLoads((current) => current.map((load) =>
+        load.tripId === tripId ? { ...load, status: 'ready_to_depart' } : load,
+      ));
+      setTripDataById((current) => {
+        const trip = current[tripId];
+        return trip
+          ? {
+            ...current,
+            [tripId]: {
+              ...trip,
+              queueItem: { ...trip.queueItem, status: 'ready_to_depart' },
+            },
+          }
+          : current;
+      });
+      await refreshQueue();
+    } catch (error) {
+      setReadyErrors((current) => ({
+        ...current,
+        [tripId]: error instanceof Error
+          ? error.message
+          : 'Could not mark this trip ready.',
+      }));
+      setReadyBlockers((current) => ({
+        ...current,
+        [tripId]: readyBlockersFrom(error),
+      }));
+    } finally {
+      setReadyingTripId((current) => current === tripId ? null : current);
+    }
+  }, [refreshQueue, token]);
+
   const value =
     useMemo<LoaderContextValue>(
       () => ({
@@ -457,6 +525,10 @@ export function LoaderProvider({
         startLoadingTrip,
         startingTripId,
         operationErrors,
+        readyingTripId,
+        readyErrors,
+        readyBlockers,
+        markTripReady,
         tripDataById,
         quantities,
         confirmedItemIds,
@@ -522,6 +594,9 @@ export function LoaderProvider({
           setTripDataById({});
           setTripErrors({});
           setOperationErrors({});
+          setReadyingTripId(null);
+          setReadyErrors({});
+          setReadyBlockers({});
           setQuantities({});
           setConfirmedItemIds([]);
           setSavingLineIds([]);
@@ -607,6 +682,10 @@ export function LoaderProvider({
         startLoadingTrip,
         startingTripId,
         operationErrors,
+        readyingTripId,
+        readyErrors,
+        readyBlockers,
+        markTripReady,
         reviewedPlanVehicleIds,
         savingLineIds,
         lineErrors,
@@ -628,6 +707,18 @@ export function LoaderProvider({
       {children}
     </LoaderContext.Provider>
   );
+}
+
+function readyBlockersFrom(error: unknown): ReadyTripBlocker[] {
+  if (!(error instanceof ApiError) || !Array.isArray(error.details)) {
+    return [];
+  }
+
+  return error.details.filter((blocker): blocker is ReadyTripBlocker =>
+    typeof blocker === 'object' &&
+    blocker !== null &&
+    'type' in blocker &&
+    typeof blocker.type === 'string');
 }
 
 export function useLoader() {

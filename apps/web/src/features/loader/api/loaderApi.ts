@@ -155,6 +155,30 @@ export interface AcknowledgeLoadingIssueDto {
   alreadyAcknowledged: boolean;
 }
 
+export interface ReadyTripBlocker {
+  type: string;
+  issueId?: string;
+  orderLineId?: string;
+  expectedQty?: number;
+  loadedQty?: number;
+}
+
+export interface ReadyTripDto {
+  tripId: string;
+  tripStatus: 'READY';
+  loadingRecordId: string;
+  loadingStatus: 'COMPLETED';
+  completedAt: string;
+  alreadyReady: boolean;
+  shortfalls: Array<{
+    issueId: string;
+    orderLineId: string;
+    expectedQty: number;
+    loadedQty: number;
+    shortfallQty: number;
+  }>;
+}
+
 export async function fetchLoaderTrips(
   token: string,
   signal?: AbortSignal,
@@ -223,6 +247,19 @@ export function acknowledgeLoadingIssue(
 ): Promise<AcknowledgeLoadingIssueDto> {
   return apiFetch<AcknowledgeLoadingIssueDto>(
     `/loading/issues/${encodeURIComponent(issueId)}/acknowledge`,
+    {
+      method: 'POST',
+      token,
+    },
+  );
+}
+
+export function markTripReady(
+  token: string,
+  tripId: string,
+): Promise<ReadyTripDto> {
+  return apiFetch<ReadyTripDto>(
+    `/trips/${encodeURIComponent(tripId)}/ready`,
     {
       method: 'POST',
       token,

@@ -32,7 +32,12 @@ export async function apiFetch<T>(path: string, init: ApiRequestInit = {}): Prom
   const text = await res.text();
   const body = text ? JSON.parse(text) : null;
   if (!res.ok) {
-    throw new ApiError(res.status, body?.code ?? 'HTTP_ERROR', body?.message ?? res.statusText, body?.details ?? null);
+    throw new ApiError(
+      res.status,
+      body?.code ?? 'HTTP_ERROR',
+      body?.message ?? res.statusText,
+      body?.details ?? body?.blockers ?? null,
+    );
   }
   return body as T;
 }

@@ -1,6 +1,4 @@
-import React, {
-  useMemo,
-} from 'react';
+import React from 'react';
 
 import {
   Link,
@@ -15,6 +13,7 @@ import {
 } from 'lucide-react';
 
 import { useLoader } from '../contexts/LoaderContext';
+import type { ReadyTripBlocker } from '../api/loaderApi';
 
 import {
   computeLoadTotals,
@@ -54,7 +53,10 @@ export function CompletedLoad() {
     issues,
     quantities,
     handedOffVehicleIds,
-    confirmHandoff,
+    markTripReady,
+    readyingTripId,
+    readyErrors,
+    readyBlockers,
   } = useLoader();
 
   const tripId =
@@ -86,81 +88,60 @@ export function CompletedLoad() {
   } = trip;
 
   const ordersWithActuals =
-    useMemo(
-      () =>
-        orders.map(
-          (order) => ({
-            ...order,
+    orders.map(
+      (order) => ({
+        ...order,
 
-            items:
-              order.items.map(
-                (item) => ({
-                  ...item,
+        items:
+          order.items.map(
+            (item) => ({
+              ...item,
 
-                  loaded:
-                    quantities[
-                    item.id
-                    ] ??
-                    item.loaded,
-                }),
-              ),
-          }),
-        ),
-      [
-        orders,
-        quantities,
-      ],
+              loaded:
+                quantities[
+                item.id
+                ] ??
+                item.loaded,
+            }),
+          ),
+      }),
     );
 
   const totals =
-    useMemo(
-      () =>
-        computeLoadTotals(
-          ordersWithActuals,
-        ),
-      [
-        ordersWithActuals,
-      ],
+    computeLoadTotals(
+      ordersWithActuals,
     );
 
   const shortItems =
-    useMemo<
-      ShortItem[]
-    >(
-      () =>
-        ordersWithActuals.flatMap(
-          (order) =>
-            order.items
-              .filter(
-                (item) =>
-                  item.loaded <
-                  item.expected,
-              )
-              .map(
-                (item) => ({
-                  itemId:
-                    item.id,
+    ordersWithActuals.flatMap<ShortItem>(
+      (order) =>
+        order.items
+          .filter(
+            (item) =>
+              item.loaded <
+              item.expected,
+          )
+          .map(
+            (item) => ({
+              itemId:
+                item.id,
 
-                  orderId:
-                    order.id,
+              orderId:
+                order.id,
 
-                  name:
-                    item.name,
+              name:
+                item.name,
 
-                  expected:
-                    item.expected,
+              expected:
+                item.expected,
 
-                  loaded:
-                    item.loaded,
+              loaded:
+                item.loaded,
 
-                  unit:
-                    item.unit,
-                }),
-              ),
-        ),
-      [
-        ordersWithActuals,
-      ],
+              unit:
+                item.unit,
+            }),
+          ),
     );
 
   const tripIssues =
@@ -191,7 +172,8 @@ export function CompletedLoad() {
         return (
           !issue ||
           issue.resolution !==
-          'ship_short'
+          'ship_short' ||
+          !issue.decisionReceived
         );
       },
     );
@@ -199,13 +181,30 @@ export function CompletedLoad() {
   const canBecomeReady =
     openIssues.length ===
     0 &&
+    tripIssues.every(
+      (issue) =>
+        issue.resolution === 'replacement_loaded' ||
+        issue.resolution === 'open' ||
+        issue.decisionReceived,
+    ) &&
     unresolvedShortItems.length ===
     0;
 
   const readyRecorded =
+    queueItem.status ===
+    'ready_to_depart' ||
     handedOffVehicleIds.includes(
       tripId,
     );
+
+  const markingReady =
+    readyingTripId === tripId;
+
+  const readyError =
+    readyErrors[tripId];
+
+  const backendBlockers =
+    readyBlockers[tripId] ?? [];
 
   const loadPath =
     `/trips/${encodeURIComponent(
@@ -358,6 +357,10 @@ export function CompletedLoad() {
                         issue?.resolution ===
                         'ship_short';
 
+                      const cleared =
+                        shipShort &&
+                        issue.decisionReceived;
+
                       const waiting =
                         issue?.resolution ===
                         'open' ||
@@ -389,12 +392,12 @@ export function CompletedLoad() {
                         >
                           <div className="flex gap-3">
                             <span
-                              className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${shipShort
+                              className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${cleared
                                   ? 'bg-brand-pale text-forest'
                                   : 'bg-amber-pale text-amber-ink'
                                 }`}
                             >
-                              {shipShort ? (
+                              {cleared ? (
                                 <PackageCheckIcon
                                   aria-hidden="true"
                                   className="h-5 w-5"
@@ -436,7 +439,7 @@ export function CompletedLoad() {
                                 }
                               </p>
 
-                              {shipShort ? (
+                              {cleared ? (
                                 <p className="mt-2 text-sm font-semibold text-forest">
                                   Ship{' '}
                                   {
@@ -460,6 +463,8 @@ export function CompletedLoad() {
                                 <p className="mt-2 text-sm font-semibold text-amber-ink">
                                   {!issue
                                     ? 'Issue not reported'
+                                    : shipShort
+                                      ? 'Dispatcher decision must be acknowledged'
                                     : waiting
                                       ? 'Awaiting Dispatcher decision'
                                       : 'Valid ship-short decision required'}
@@ -475,7 +480,7 @@ export function CompletedLoad() {
                               item.itemId,
                             )}
                             className={buttonStyles(
-                              shipShort
+                              cleared
                                 ? 'secondary'
                                 : 'outline',
                               'md',
@@ -598,6 +603,40 @@ export function CompletedLoad() {
             </div>
           )}
 
+          {readyError && (
+            <div
+              role="alert"
+              className="mt-7 rounded-card border border-danger/25 bg-danger-pale p-5"
+            >
+              <div className="flex gap-3">
+                <CircleAlertIcon
+                  aria-hidden="true"
+                  className="mt-0.5 h-5 w-5 shrink-0 text-danger-ink"
+                />
+
+                <div>
+                  <p className="font-semibold text-danger-ink">
+                    Ready status was not recorded
+                  </p>
+
+                  <p className="mt-1 text-sm leading-6 text-danger-ink">
+                    {readyError}
+                  </p>
+
+                  {backendBlockers.length > 0 && (
+                    <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-danger-ink">
+                      {backendBlockers.map((blocker, index) => (
+                        <li key={`${blocker.type}-${blocker.orderLineId ?? blocker.issueId ?? index}`}>
+                          {readyBlockerLabel(blocker)}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {readyRecorded && (
             <div
               role="status"
@@ -672,14 +711,15 @@ export function CompletedLoad() {
 
             <Button
               size="lg"
-              onClick={() =>
-                confirmHandoff(
+              onClick={() => {
+                void markTripReady(
                   tripId,
-                )
-              }
+                );
+              }}
               disabled={
                 readyRecorded ||
-                !canBecomeReady
+                !canBecomeReady ||
+                markingReady
               }
             >
               <SendIcon
@@ -689,7 +729,9 @@ export function CompletedLoad() {
 
               {readyRecorded
                 ? 'Ready Status Recorded'
-                : 'Confirm Ready to Depart'}
+                : markingReady
+                  ? 'Recording Ready Status…'
+                  : 'Confirm Ready to Depart'}
             </Button>
           </div>
         </div>
@@ -765,6 +807,29 @@ function buildIssueLink(
     });
 
   return `/issues?${params.toString()}`;
+}
+
+function readyBlockerLabel(blocker: ReadyTripBlocker): string {
+  const item = blocker.orderLineId
+    ? `Item ${blocker.orderLineId}`
+    : 'This trip';
+
+  switch (blocker.type) {
+    case 'OPEN_ISSUE':
+      return `${item} has an open loading issue.`;
+    case 'DECISION_NOT_ACKNOWLEDGED':
+      return `${item}'s Dispatcher decision has not been acknowledged.`;
+    case 'QUANTITY_NOT_VERIFIED':
+      return `${item}'s loaded quantity has not been verified.`;
+    case 'QUANTITY_EXCEEDS_EXPECTED':
+      return `${item}'s loaded quantity exceeds the expected quantity.`;
+    case 'SHORTFALL_NOT_APPROVED':
+      return `${item}'s shortage does not have an approved decision.`;
+    case 'INVALID_LOADING_STATE':
+      return 'The trip does not have an active loading record.';
+    default:
+      return `${item} still requires attention.`;
+  }
 }
 
 function CompletionUnavailable() {
