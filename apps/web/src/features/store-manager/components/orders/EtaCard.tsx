@@ -1,4 +1,3 @@
-import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import type { Order } from '../../types/orders';
@@ -6,22 +5,12 @@ import { Card } from '../ui/Card';
 import { buttonStyles } from '../ui/Button';
 import { formatClock, formatTime24, toMinutes } from '../../utils/time';
 import { formatDate, relativeDay } from '../../utils/format';
-import { NOW_MINUTES } from '../../data/schedule';
 
-const REFRESH_EVERY = 30;
+
+
 
 export function EtaCard({ order }: {order: Order;}) {
-  const [tick, setTick] = useState(0);
   const live = order.status === 'in_transit' || order.status === 'loading';
-
-  useEffect(() => {
-    if (!live) return;
-    const id = window.setInterval(() => setTick((t) => t + 1), 1000);
-    return () => window.clearInterval(id);
-  }, [live]);
-
-  const since = tick % REFRESH_EVERY;
-  const refreshes = Math.floor(tick / REFRESH_EVERY);
 
   if (order.status === 'deferred' && order.deferral) {
     return (
@@ -60,7 +49,7 @@ export function EtaCard({ order }: {order: Order;}) {
     return (
       <Card className="p-4 md:p-6">
         <p className="text-sm font-medium text-subtle">Expected arrival</p>
-        <p className="mt-2 text-[32px] font-semibold leading-none text-ink lg:text-[40px]">Not planned yet</p>
+        <p className="mt-2 text-[32px] font-semibold leading-none text-ink lg:text-[40px]">Awaiting arrival estimate</p>
         <p className="mt-2 text-sm text-subtle">
           The dispatcher plans routes by 8:00 PM the day before delivery. Requested for {formatDate(order.requestedDate)}.
         </p>
@@ -68,8 +57,8 @@ export function EtaCard({ order }: {order: Order;}) {
 
   }
 
-  const etaMinutes = toMinutes(order.eta) + (refreshes % 3 === 1 ? 2 : 0);
-  const away = order.requestedDate === '2026-09-28' ? Math.max(1, etaMinutes - NOW_MINUTES - Math.floor(tick / 60)) : null;
+  const etaMinutes = toMinutes(order.eta);
+  const away = null;
 
   return (
     <Card className="p-4 md:p-6">
@@ -81,7 +70,7 @@ export function EtaCard({ order }: {order: Order;}) {
               <span className="absolute inline-flex h-full w-full rounded-full bg-brand-mint opacity-75 motion-safe:animate-ping" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-brand-medium" />
             </span>
-            {since < 3 ? 'Updated just now' : `Updated ${since}s ago`}
+            Dispatch estimate
           </p>
         }
       </div>

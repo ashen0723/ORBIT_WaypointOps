@@ -1,4 +1,3 @@
-import React from 'react';
 import type { Brand } from '../../types/orders';
 
 const STYLES: Record<Brand, string> = {

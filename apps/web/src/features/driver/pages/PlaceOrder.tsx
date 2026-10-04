@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PackageIcon, SnowflakeIcon } from 'lucide-react';
 import type { Brand, LineDraft, OrderType } from '../types/orders';

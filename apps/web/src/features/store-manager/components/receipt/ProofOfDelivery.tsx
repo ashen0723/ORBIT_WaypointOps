@@ -1,4 +1,4 @@
-import React from 'react';
+import { EvidenceGallery } from '../../../../components/shared/EvidenceGallery';
 import type { Order } from '../../types/orders';
 import { Card } from '../ui/Card';
 import { formatTime24 } from '../../utils/time';
@@ -18,7 +18,7 @@ export function ProofOfDelivery({ order }: {order: Order;}) {
       <p className="mt-3 text-sm text-subtle">Delivered at {time}. Check the quantities recorded by the driver against what arrived.</p>
       {order.pod?.receivedBy && <p className="mt-3 text-sm text-ink">Recipient: {order.pod.receivedBy}</p>}
       {(order.pod?.photoRef || order.pod?.signatureRef) ?
-        <p className="mt-3 text-sm text-subtle">Proof was recorded by the driver. File previews will be available when attachment access is connected.</p> :
+        <EvidenceGallery ids={[order.pod?.photoRef, order.pod?.signatureRef].filter((id): id is string => Boolean(id))} /> :
         <p className="mt-3 text-sm text-subtle">No photo or signature was attached to this delivery.</p>}
     </Card>
   );

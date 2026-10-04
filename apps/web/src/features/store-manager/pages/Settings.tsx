@@ -1,4 +1,5 @@
-import React, { FormEvent, useState } from 'react';
+import type React from 'react';
+import { FormEvent, useState } from 'react';
 import { toast } from 'sonner';
 import {
   BellRingIcon,
@@ -15,6 +16,7 @@ import { Button } from '../components/ui/Button';
 import { Avatar } from '../components/ui/Avatar';
 import { MANAGER, OUTLET_NAME } from '../data/schedule';
 import { useScreenInit } from '../useScreenInit.js';
+import { useAuth } from '../../../app/providers/AuthProvider';
 import { useOrders } from '../contexts/OrdersContext';
 
 type SettingsTab = 'profile' | 'security' | 'notifications';
@@ -36,9 +38,10 @@ const PREFERENCES = [
 
 
 export function Settings() {
-  const { live } = useOrders();
+  const { live, store } = useOrders();
+  const { user } = useAuth();
   const screenInit = useScreenInit();
-  const initialTab: SettingsTab = ['profile', 'security', 'notifications'].includes(screenInit.active) ? screenInit.active : 'profile';
+  const initialTab: SettingsTab = ['profile', 'security', 'notifications'].includes(screenInit.active ?? 'profile') ? (screenInit.active ?? 'profile') : 'profile';
   const [active, setActive] = useState<SettingsTab>(initialTab);
   const [editing, setEditing] = useState(false);
   const [profile, setProfile] = useState({
@@ -57,7 +60,7 @@ export function Settings() {
     toast.success('Profile updated', { description: 'Your contact details have been saved.' });
   };
 
-  if (live) return <PageContainer><PageHeader title="Profile Settings" subtitle="Your Store account" /><Card className="mt-6 p-6"><p className="text-sm text-subtle">Account details and preferences will be available when profile services are connected.</p></Card></PageContainer>;
+  if (live) return <PageContainer><PageHeader title="Profile Settings" subtitle="Your Store account" /><Card className="mt-6 p-6"><h2 className="text-lg font-semibold">{user?.name}</h2><dl className="mt-6 space-y-4 text-sm"><div><dt className="text-subtle">Email</dt><dd>{user?.email}</dd></div><div><dt className="text-subtle">Outlet</dt><dd>{store?.outletName}</dd></div><div><dt className="text-subtle">Role</dt><dd>Store Manager</dd></div></dl><p className="mt-6 text-sm text-subtle">Contact your administrator to update your account details.</p></Card></PageContainer>;
 
   return (
     <PageContainer>

@@ -1,4 +1,3 @@
-import React from 'react';
 
 type Tone = 'surface' | 'forest' | 'pale' | 'mint' | 'soft';
 

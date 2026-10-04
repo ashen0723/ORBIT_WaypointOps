@@ -1,4 +1,3 @@
-import React from 'react';
 import { Card } from '../ui/Card';
 import { useOrders } from '../../contexts/OrdersContext';
 import { WEEK_START } from '../../data/schedule';

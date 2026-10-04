@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { HeadsetIcon, PhoneIcon } from 'lucide-react';
@@ -30,7 +30,7 @@ export function OrderStatus() {
   if (!order) return loading ? <PageContainer><p role="status">Loading order…</p></PageContainer> : <OrderNotFound />;
 
   const primary =
-  order.status === 'delivered' && !order.receiptConfirmed ?
+  (live ? Boolean(order.deliveryId) : order.status === 'delivered') && !order.receiptConfirmed ?
   { label: 'Confirm Receipt', to: `/orders/${order.id}/receipt` } :
   order.status === 'deferred' ?
   { label: 'View Deferral Notice', to: `/orders/${order.id}/deferral` } :
@@ -70,7 +70,7 @@ export function OrderStatus() {
         }
         actions={
         <>
-            {!live && <Button variant="secondary" size="lg" onClick={() => setContactOpen(true)} className="flex-1 md:flex-none">
+            {<Button variant="secondary" size="lg" onClick={() => setContactOpen(true)} className="flex-1 md:flex-none">
               <HeadsetIcon aria-hidden="true" className="h-4 w-4" />
               Contact Dispatcher
             </Button>}
@@ -85,6 +85,7 @@ export function OrderStatus() {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          {order.deliveryError && <Card className="p-4 text-danger-ink" role="alert">Delivery details unavailable: {order.deliveryError}</Card>}
           <EtaCard order={order} />
           <Card className="p-4 md:p-6">
             <h2 className="text-base font-semibold text-ink">Status</h2>
@@ -113,7 +114,7 @@ export function OrderStatus() {
         </div>
 
         <div className="space-y-6">
-          {live ? <Card className="p-4 md:p-6"><h2 className="text-base font-semibold text-ink">Route tracking</h2><p className="mt-2 text-sm text-subtle">Vehicle location is not available yet.</p></Card> : <RouteMap order={order} />}
+          <RouteMap order={order} />
           <Card className="p-4 md:p-6">
             <h2 className="text-base font-semibold text-ink">Order details</h2>
             <dl className="mt-4 space-y-3 text-sm">
@@ -132,8 +133,9 @@ export function OrderStatus() {
         open={contactOpen}
         onClose={() => setContactOpen(false)}
         title="Contact Dispatcher"
-        description={`${DISPATCHER.name} · ${DISPATCHER.hours}`}>
+        description={live ? 'Contact your assigned dispatch team' : `${DISPATCHER.name} · ${DISPATCHER.hours}`}>
         
+        {live ? <p className="text-sm text-subtle">Use your outlet’s dispatch contact and quote order {order.id}. In-app messaging is not available yet.</p> : <>
         <a href={`tel:${DISPATCHER.phone.replace(/\s/g, '')}`} className={buttonStyles('secondary', 'lg', true)}>
           <PhoneIcon aria-hidden="true" className="h-4 w-4" />
           Call {DISPATCHER.phone}
@@ -166,6 +168,7 @@ export function OrderStatus() {
             Send Message
           </Button>
         </div>
+        </>}
       </Modal>
     </PageContainer>);
 

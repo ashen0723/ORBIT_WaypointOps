@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import { useOrders } from '../contexts/OrdersContext';
 import { PageContainer } from '../components/ui/PageContainer';

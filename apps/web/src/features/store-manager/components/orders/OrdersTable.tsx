@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowDownIcon, ArrowUpIcon, ChevronRightIcon, ChevronsUpDownIcon } from 'lucide-react';
 import type { Order } from '../../types/orders';
@@ -157,8 +157,8 @@ export function OrdersTable({ orders, label, defaultSort = { key: 'requestedDate
           {sorted.map((order) => {
             const action = orderAction(order);
             return (
-              <li key={order.id} className="relative flex flex-col rounded-card bg-surface p-4 shadow-card">
-                <div className="flex items-start justify-between gap-2">
+              <li key={order.id} className="relative min-w-0 flex flex-col rounded-card bg-surface p-4 shadow-card">
+                <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
                   <Link
                     to={`/orders/${order.id}`}
                     className="rounded text-base font-semibold tabular-nums text-ink after:absolute after:inset-0 after:rounded-card focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-brand">

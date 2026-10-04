@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import type {
   DispatcherOrderView,
   TripView,
@@ -12,7 +12,6 @@ import {
   Badge,
   Button,
   DataTable,
-  EmptyState,
   ErrorPanel,
   Panel,
   ReadState,
@@ -44,160 +43,10 @@ export function useTrips(poll = 0) {
     poll,
   );
 }
-export function Dashboard() {
-  const { api, date, depotId } = useDispatcher(),
-    trips = useTrips(),
-    fleet = useFleet();
-  const orders = useQuery(`dashboard-orders:${date}:${depotId}`, (s) =>
-    api.all<DispatcherOrderView>("/dispatcher/orders", { date, depotId }, s),
-  );
-  const rows = orders.data ?? [],
-    ts = trips.data ?? [];
-  return (
-    <>
-      <div className="dispatch-page-title">
-        <div>
-          <h1>Dispatcher Dashboard</h1>
-          <p>Plan the run, clear exceptions and follow the team’s progress.</p>
-        </div>
-        <Button
-          variant="secondary"
-          onClick={() => {
-            orders.refresh();
-            trips.refresh();
-            fleet.refresh();
-          }}
-        >
-          Refresh dashboard
-        </Button>
-      </div>
-      <ErrorPanel
-        error={orders.error || trips.error || fleet.error}
-        retry={() => {
-          orders.refresh();
-          trips.refresh();
-          fleet.refresh();
-        }}
-      />
-      <div className="dispatch-stats">
-        {[
-          {
-            label: "Waiting for allocation",
-            value: rows.filter(
-              (o) =>
-                !o.activeTripId && ["CONFIRMED", "DEFERRED"].includes(o.status),
-            ).length,
-            to: "/orders",
-            ready: !!orders.data,
-          },
-          {
-            label: "Loading / ready",
-            value: ts.filter((t) => ["LOADING", "READY"].includes(t.status))
-              .length,
-            to: "/trips",
-            ready: !!trips.data,
-          },
-          {
-            label: "On the road",
-            value: ts.filter((t) => t.status === "IN_TRANSIT").length,
-            to: "/operations",
-            ready: !!trips.data,
-          },
-          {
-            label: "Vehicles available",
-            value: fleet.data?.filter(
-              (v) =>
-                v.availableOnDate &&
-                v.allocatedTripCountOnDate < 2 &&
-                v.remainingFuelL > 0,
-            ).length,
-            to: "/vehicles",
-            ready: !!fleet.data,
-          },
-          {
-            label: "Repeat deferrals",
-            value: rows.filter((o) => o.deferralCount >= 2).length,
-            to: "/deferred",
-            ready: !!orders.data,
-          },
-        ].map((s) => (
-          <Link className="dispatch-stat" key={s.label} to={s.to}>
-            <span>{s.label}</span>
-            <strong>{s.ready ? s.value : "—"}</strong>
-            <small>View details →</small>
-          </Link>
-        ))}
-      </div>
-      <Panel title="Action required">
-        <ReadState
-          loading={orders.loading || trips.loading}
-          error={null}
-          empty={false}
-          retry={orders.refresh}
-        >
-          {ts
-            .filter((t) => !t.publishedAt)
-            .map((t) => (
-              <Link
-                className="dispatch-action-row"
-                key={t.id}
-                to={`/trips/${t.id}`}
-              >
-                <span>
-                  <b>
-                    {t.vehicleId} · trip {t.tripNo}
-                  </b>
-                  <small>Allocated; waiting to be published to Loader</small>
-                </span>
-                <Badge status="UNPUBLISHED" />
-              </Link>
-            ))}
-          {rows
-            .filter((o) => o.recoveryPending || o.deferralCount >= 2)
-            .map((o) => (
-              <Link
-                className="dispatch-action-row"
-                key={o.id}
-                to={o.recoveryPending ? "/operations" : "/deferred"}
-              >
-                <span>
-                  <b>{o.outletName}</b>
-                  <small>
-                    {o.recoveryPending
-                      ? "Outstanding recovery decision"
-                      : `${o.deferralCount} deferrals · ${o.deferReason ?? "Review next run"}`}
-                  </small>
-                </span>
-                <Badge status={o.status} />
-              </Link>
-            ))}
-          {!ts.some((t) => !t.publishedAt) &&
-            !rows.some((o) => o.recoveryPending || o.deferralCount >= 2) && (
-              <EmptyState title="No allocation or recovery alerts">
-                Open Operations Status for live loading and Driver exceptions.
-              </EmptyState>
-            )}
-        </ReadState>
-      </Panel>
-      <Panel title="Delivery workflow">
-        <div className="dispatch-flow">
-          Order → Save draft → Validate → Allocate → Publish → Load → Deliver →
-          Receipt
-        </div>
-        <p className="dispatch-muted">
-          A draft holds no orders, vehicle slots or fuel. Allocation reserves
-          them; publish makes the trip visible to Loader.
-        </p>
-        <Link className="dispatch-link" to="/planning">
-          Open Planning Workspace →
-        </Link>
-      </Panel>
-    </>
-  );
-}
-export function OrdersPage({ deferred = false }: { deferred?: boolean }) {
+export function OrdersPage({ deferred = false, history = false }: { deferred?: boolean; history?: boolean }) {
+  const [params] = useSearchParams();
   const { api, date, depotId } = useDispatcher();
-  const [allDates, setAllDates] = useState(deferred),
+  const [allDates, setAllDates] = useState(deferred || history || params.get("allDates") === "1"),
     [search, setSearch] = useState(""),
     [status, setStatus] = useState(""),
     [brand, setBrand] = useState(""),
@@ -214,6 +63,7 @@ export function OrdersPage({ deferred = false }: { deferred?: boolean }) {
   );
   const rows = (result.data ?? []).filter(
     (o) =>
+      (!history || ["RECEIVED", "DELIVERED"].includes(o.status)) &&
       (!deferred || o.status === "DEFERRED" || o.deferralCount > 0) &&
       (!brand || o.brand === brand) &&
       `${o.id} ${o.outletName} ${o.outletId}`
@@ -224,7 +74,7 @@ export function OrdersPage({ deferred = false }: { deferred?: boolean }) {
     <>
       <div className="dispatch-page-title">
         <div>
-          <h1>{deferred ? "Deferred Orders" : "Orders Queue"}</h1>
+          <h1>{history ? "Order History" : deferred ? "Deferrals" : "Orders Queue"}</h1>
           <p>
             {deferred
               ? "Review reasons, previous decisions and the next eligible run."
@@ -616,15 +466,15 @@ export function TripsPage() {
     </>
   );
 }
-export function OperationsPage() {
+export function OperationsPage({ mode = "all" }: {mode?: "all" | "loading" | "monitoring"}) {
   const trips = useTrips(15000);
   const [status, setStatus] = useState("");
-  const rows = (trips.data ?? []).filter((t) => !status || t.status === status);
+  const rows = (trips.data ?? []).filter((t) => (!status || t.status === status) && (mode === 'all' || (mode === 'loading' ? ['CONFIRMED','LOADING','READY'].includes(t.status) : ['IN_TRANSIT','COMPLETED','COMPLETED_WITH_EXCEPTIONS'].includes(t.status))));
   return (
     <>
       <div className="dispatch-page-title">
         <div>
-          <h1>Operations Status</h1>
+          <h1>{mode === "loading" ? "Loading" : mode === "monitoring" ? "Delivery Monitoring" : "Operations Status"}</h1>
           <p>
             Updates every 15 seconds while this page is visible.{" "}
             {trips.updatedAt &&

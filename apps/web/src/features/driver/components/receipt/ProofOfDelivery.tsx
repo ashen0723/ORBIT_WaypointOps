@@ -1,4 +1,3 @@
-import React from 'react';
 import type { Order } from '../../types/orders';
 import { Card } from '../ui/Card';
 import { formatTime24 } from '../../utils/time';

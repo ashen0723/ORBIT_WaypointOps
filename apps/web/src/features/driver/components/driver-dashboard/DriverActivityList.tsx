@@ -1,4 +1,3 @@
-import React from 'react';
 import { CheckIcon, Clock3Icon, PackageCheckIcon, TriangleAlertIcon } from 'lucide-react';
 import { useDriver } from '../../contexts/DriverContext';
 import { TRIP_ONE } from '../../data/driver';

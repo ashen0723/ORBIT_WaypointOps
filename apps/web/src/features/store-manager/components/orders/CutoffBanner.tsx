@@ -1,9 +1,11 @@
-import React from 'react';
 import { ClockIcon, OctagonAlertIcon, TriangleAlertIcon } from 'lucide-react';
 import { pad2, splitCountdown } from '../../utils/time';
+import { useOrders } from '../../contexts/OrdersContext';
 import { CUTOFF_LABEL } from '../../data/schedule';
 
 export function CutoffBanner({ seconds }: {seconds: number;}) {
+  const { live, store } = useOrders();
+  const cutoffLabel = live && store?.cutoffAt ? new Date(store.cutoffAt).toLocaleString('en-LK', { timeZone: 'Asia/Colombo', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : `Today ${CUTOFF_LABEL}`;
   const { h, m, s } = splitCountdown(seconds);
   const past = seconds === 0;
   const warn = !past && seconds < 3600;
@@ -21,10 +23,10 @@ export function CutoffBanner({ seconds }: {seconds: number;}) {
         <Icon aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" />
         <span>
           {past ?
-          <>Order cutoff passed: Today {CUTOFF_LABEL} — ordering is closed until 6:00 AM tomorrow.</> :
+          <>{live ? 'Checking the next eligible delivery run…' : `Order cutoff passed: Today ${CUTOFF_LABEL}`}</> :
 
           <>
-              Order cutoff: Today {CUTOFF_LABEL} — {h}h {m}m remaining
+              Order cutoff: {cutoffLabel} — {h}h {m}m remaining
             </>
           }
         </span>

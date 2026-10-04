@@ -1,4 +1,3 @@
-import React from 'react';
 import { CheckIcon, TriangleAlertIcon } from 'lucide-react';
 import type { Order } from '../../types/orders';
 import { TIMELINE_STEPS } from '../../utils/orders';

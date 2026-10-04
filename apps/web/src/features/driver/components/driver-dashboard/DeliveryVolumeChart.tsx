@@ -1,4 +1,3 @@
-import React from 'react';
 import { TRIP_ONE } from '../../data/driver';
 
 const BAR_TONES = ['hatch-stripes', 'bg-brand-medium', 'bg-brand-mint', 'bg-forest', 'hatch-stripes'];

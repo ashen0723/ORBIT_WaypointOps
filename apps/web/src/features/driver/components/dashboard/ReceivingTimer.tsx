@@ -1,4 +1,3 @@
-import React from 'react';
 import { Clock3Icon, PackagePlusIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { CurvedLines } from '../ui/CurvedLines';

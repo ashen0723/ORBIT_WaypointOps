@@ -1,4 +1,3 @@
-import React from 'react';
 import { toast } from 'sonner';
 import { SmartphoneIcon } from 'lucide-react';
 import { CurvedLines } from '../ui/CurvedLines';
@@ -14,10 +13,10 @@ export function AppPromoCard() {
       <p className="relative mt-1 text-xs text-white/75">Receive deliveries right on the floor</p>
       <button
         type="button"
-        onClick={() => toast.success('Download link sent', { description: 'Check your phone for a text from Waypoint.' })}
+        onClick={() => toast('Use Waypoint on your phone', { description: 'Open this site on your phone, then choose Add to Home Screen from your browser menu.' })}
         className="relative mt-4 h-10 w-full rounded-full bg-gradient-to-r from-forest to-brand text-sm font-semibold transition-[filter] duration-150 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
         
-        Download
+        Get the app
       </button>
     </div>);
 

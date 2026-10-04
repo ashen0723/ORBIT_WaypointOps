@@ -1,4 +1,3 @@
-import React from 'react';
 import { toast } from 'sonner';
 import { SmartphoneIcon } from 'lucide-react';
 import { CurvedLines } from '../ui/CurvedLines';

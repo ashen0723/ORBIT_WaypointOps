@@ -1,4 +1,3 @@
-import React from 'react';
 import { ArrowRightIcon, MapPinnedIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useDriver } from '../../contexts/DriverContext';

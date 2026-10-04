@@ -1,7 +1,12 @@
-import React, { HTMLAttributes } from 'react';
+import { HTMLAttributes } from "react";
 export function Card({
-  className = '',
+  className = "",
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={`rounded-card border border-line/70 bg-surface shadow-card ${className}`} {...props} />;
+  return (
+    <div
+      className={`rounded-card border border-line/70 bg-surface shadow-card ${className}`}
+      {...props}
+    />
+  );
 }

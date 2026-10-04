@@ -1,4 +1,3 @@
-import React from 'react';
 import { MenuIcon } from 'lucide-react';
 import { Logo } from './Logo';
 import { NotificationsMenu } from './NotificationsMenu';

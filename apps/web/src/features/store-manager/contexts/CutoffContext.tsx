@@ -1,4 +1,5 @@
-import React, { createContext, ReactNode, useContext } from 'react';
+import { createContext, ReactNode, useContext } from 'react';
+import { useOrders } from './OrdersContext';
 import { useCountdown } from '../hooks/useCountdown';
 
 const CutoffContext = createContext<number>(0);
@@ -9,7 +10,8 @@ interface CutoffProviderProps {
 }
 
 export function CutoffProvider({ initialSeconds, children }: CutoffProviderProps) {
-  const seconds = useCountdown(initialSeconds);
+  const { store, live } = useOrders();
+  const seconds = useCountdown(live ? Math.max(0, Math.floor((Date.parse(store?.cutoffAt ?? '') - Date.now()) / 1000) || 0) : initialSeconds);
   return <CutoffContext.Provider value={seconds}>{children}</CutoffContext.Provider>;
 }
 

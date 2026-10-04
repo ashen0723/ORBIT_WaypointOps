@@ -1,4 +1,3 @@
-import React from 'react';
 import { ClockIcon, OctagonAlertIcon, TriangleAlertIcon } from 'lucide-react';
 import { pad2, splitCountdown } from '../../utils/time';
 import { CUTOFF_LABEL } from '../../data/schedule';

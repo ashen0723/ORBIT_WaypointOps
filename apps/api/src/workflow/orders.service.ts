@@ -53,6 +53,16 @@ export class ConnectedOrdersService {
       return order;
     fail(403, "FORBIDDEN", "Order is outside this account’s scope.");
   }
+  async storeContext(actor: Actor) {
+    const outlet = actor.outletId ? await this.db.outlet.findUnique({ where: { id: actor.outletId } }) : null;
+    if (!outlet) fail(403, "FORBIDDEN", "Store account needs an outlet.");
+    const now = new Date();
+    const days = await this.db.operatingDay.findMany({ where: { operating: true, date: { gte: now } }, orderBy: { date: "asc" } });
+    const nextRun = eligibleRun(days, outlet, now);
+    return { outletName: outlet.name, brand: outlet.brand, scheduledWeekday: outlet.scheduledWeekday,
+      nextDeliveryDate: nextRun?.date.toISOString().slice(0, 10) ?? null,
+      cutoffAt: nextRun ? runCutoff(nextRun.date.toISOString().slice(0, 10)).toISOString() : null };
+  }
   async catalog(actor: Actor, query: Record<string, unknown>) {
     const outlet = actor.outletId
       ? await this.db.outlet.findUnique({ where: { id: actor.outletId } })
@@ -249,7 +259,8 @@ export class ConnectedOrdersService {
       orders.map((o) =>
         actor.role === "DISPATCHER"
           ? this.dispatcherOrder(o)
-          : this.planning.orderView(o),
+          : { ...this.planning.orderView(o), createdAt: o.createdAt.toISOString(),
+              plannedArrivalAt: o.stops.find(s => s.active)?.plannedArrivalAt?.toISOString() ?? null },
       ),
       limit,
     );

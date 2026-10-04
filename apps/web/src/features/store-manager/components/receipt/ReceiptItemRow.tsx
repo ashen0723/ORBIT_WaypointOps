@@ -1,4 +1,3 @@
-import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CheckIcon, TriangleAlertIcon } from 'lucide-react';
 import type { OrderItem } from '../../types/orders';
@@ -136,7 +135,7 @@ export function ReceiptItemRow({ item, check, showErrors, onChange, live = false
                 {descError && <p className="mt-1 text-xs font-medium text-danger-ink">Describe what’s wrong so dispatch can act on it</p>}
               </div>
 
-              {live ? <p className="text-xs text-subtle">Photo upload will be available when the attachment service is connected.</p> : <PhotoCapture photos={check.photos} onChange={(photos) => onChange({ ...check, photos })} itemName={item.name} />}
+              <PhotoCapture photos={check.photos} onChange={(photos) => onChange({ ...check, photos })} itemName={item.name} />
             </div>
           </motion.div>
         }

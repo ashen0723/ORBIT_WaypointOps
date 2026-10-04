@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { CheckIcon, CopyIcon } from 'lucide-react';
@@ -49,12 +49,12 @@ export function OrderConfirmation() {
           <h1 className="mt-4 text-2xl font-semibold tracking-tight text-ink lg:text-[32px] lg:leading-tight">Order Confirmed</h1>
           <p className="mt-4 text-xs font-medium text-subtle">Order ID</p>
           <div className="mt-1 flex items-center justify-center gap-2">
-            <p className="text-[28px] font-semibold tabular-nums tracking-tight text-ink">{order.id}</p>
+            <p className="min-w-0 break-all text-xl md:text-[28px] font-semibold tabular-nums tracking-tight text-ink">{order.id}</p>
             <button
               type="button"
               onClick={handleCopy}
               aria-label={copied ? 'Order ID copied' : 'Copy order ID'}
-              className="grid h-9 w-9 place-items-center rounded-lg text-subtle transition-colors duration-150 hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-subtle transition-colors duration-150 hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">
               
               {copied ? <CheckIcon className="h-4 w-4 text-brand-medium" /> : <CopyIcon className="h-4 w-4" />}
             </button>

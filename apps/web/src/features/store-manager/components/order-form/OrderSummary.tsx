@@ -1,4 +1,3 @@
-import React from 'react';
 import { Loader2Icon, PackageIcon } from 'lucide-react';
 import type { Brand, OrderType } from '../../types/orders';
 import { Card } from '../ui/Card';

@@ -35,7 +35,8 @@ export type DriverAction =
   | { kind: 'issue'; tripId: string; sequence?: number; reason: string; notes: string; photos: DriverPhoto[] };
 /** Kuru supplies cached shared records and queue snapshots. Acceptance must follow durable save. */
 export interface DriverIntegration {
-  getSnapshot(): { assignment?: DriverIdentity; trips: DriverTrip[]; stopRecords: Record<string, StopRecord>; departedTrips: Record<string, boolean>; actions: PendingAction[]; lastSyncedAt: string };
+  getSnapshot(): { assignment?: DriverIdentity; trips: DriverTrip[]; stopRecords: Record<string, StopRecord>; departedTrips: Record<string, boolean>; actions: PendingAction[]; lastSyncedAt: string; refreshError?: string };
+  sync?(): Promise<void>;
   subscribe(listener: () => void): () => void;
   submit(action: DriverAction): Promise<SyncState>;
   retryAction(id: string): Promise<void>;

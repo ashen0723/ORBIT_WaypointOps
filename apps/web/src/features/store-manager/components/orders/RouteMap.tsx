@@ -1,8 +1,7 @@
-import React from 'react';
 import { TruckIcon } from 'lucide-react';
 import type { Order } from '../../types/orders';
 import { Card } from '../ui/Card';
-import { OUTLET_NAME } from '../../data/schedule';
+import { useOrders } from '../../contexts/OrdersContext';
 
 const ROUTE: [number, number][] = [
 [40, 170],
@@ -19,9 +18,11 @@ const STOPS: [number, number][] = [
 
 
 export function RouteMap({ order }: {order: Order;}) {
+  const { live, store } = useOrders();
+  const OUTLET_NAME = store?.outletName ?? 'Your outlet';
   const s = order.status;
   const progress =
-  s === 'in_transit' ? order.vehicle?.progress ?? 0.5 : s === 'loading' ? 0 : s === 'delivered' || s === 'receipt_confirmed' ? 1 : null;
+  live ? null : s === 'in_transit' ? order.vehicle?.progress ?? 0.5 : s === 'loading' ? 0 : s === 'delivered' || s === 'receipt_confirmed' ? 1 : null;
   const position = progress === null ? null : pointAt(progress);
   const traveled = progress === null ? [] : traveledPoints(progress);
 
@@ -41,7 +42,7 @@ export function RouteMap({ order }: {order: Order;}) {
         <span className="text-xs text-subtle">Illustrative</span>
       </div>
       <div className="relative mt-4 overflow-hidden rounded-lg bg-canvas">
-        <svg viewBox="0 0 400 220" role="img" aria-label={caption} className="block h-auto w-full">
+        <svg viewBox="0 0 400 220" role="img" aria-label={live ? 'Route illustration. Live vehicle location is not available.' : caption} className="block h-auto w-full">
           {[40, 80, 120, 160, 200].map((y) =>
           <line key={`h${y}`} x1="0" x2="400" y1={y} y2={y} stroke="#E0E3E0" strokeWidth="1" />
           )}
@@ -74,7 +75,7 @@ export function RouteMap({ order }: {order: Order;}) {
           </span>
         }
       </div>
-      <p className="mt-4 text-sm text-ink">{caption}</p>
+      <p className="mt-4 text-sm text-ink">{live ? 'Route illustration. Live vehicle location is not available.' : caption}</p>
       {order.vehicle &&
       <p className="mt-1 text-sm text-subtle">
           {order.vehicle.driver} · {order.vehicle.vehicleType} {order.vehicle.plate}

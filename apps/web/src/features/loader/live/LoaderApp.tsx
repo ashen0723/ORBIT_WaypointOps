@@ -15,6 +15,15 @@ import { EvidenceGallery } from "../../../components/shared/EvidenceGallery";
 import { loadQueue, queueState, type LoaderCall } from "./api";
 import "../../operations/operations.css";
 import "./loader.css";
+import {
+  Truck,
+  Clock3,
+  TriangleAlert,
+  CheckCircle2,
+  ClipboardCheck,
+} from "lucide-react";
+import { LoaderShell } from "./LoaderShell";
+import { Settings } from "../pages/Settings";
 const today = () =>
   new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10);
 export function LoaderApp({ basename }: { basename?: string }) {
@@ -40,7 +49,7 @@ function LoaderScreen({
 }: {
   view: "queue" | "issues" | "completed" | "trip" | "settings";
 }) {
-  const { user, token, logout, expire } = useAuth();
+  const { user, token, expire } = useAuth();
   const { tripId } = useParams();
   const [date, setDate] = useState(
     () => sessionStorage.getItem(`waypoint.run-date:${user?.id}`) || today(),
@@ -49,6 +58,7 @@ function LoaderScreen({
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
   const epoch = useRef(0);
   const call: LoaderCall = useCallback(
     async <T,>(path: string, body?: unknown, method?: string) => {
@@ -104,77 +114,158 @@ function LoaderScreen({
   );
   const visible = loads.filter(
     (l) =>
-      (view !== "issues" || queueState(l) === "issues") &&
+      (view !== "issues" || l.issues.length > 0) &&
+      (view !== "queue" || filter === "all" || displayState(l) === filter) &&
       (view !== "completed" || queueState(l) === "completed") &&
       `${l.trip.id} ${l.trip.vehicleId} ${l.trip.status} ${l.trip.stops.map((s) => s.outletId).join(" ")}`
         .toLowerCase()
         .includes(search.toLowerCase()),
   );
+  const titles = {
+    queue: "Loading Queue",
+    issues: "Loading Issues",
+    completed: "Completed Loads",
+    trip: "Trip Loading",
+    settings: "Settings",
+  };
+  const descriptions = {
+    queue: `${user?.depotId ?? "No depot assigned"} · Published loading work for your depot`,
+    issues:
+      "Missing, damaged, replaced, and Dispatcher-resolved loading exceptions.",
+    completed: "Review loading records that have completed the Loader handoff.",
+    trip: "Review the stop sequence, check quantities, and prepare the vehicle for departure.",
+    settings: "",
+  };
+  const metrics = [
+    { state: "ready", label: "Ready", Icon: Truck },
+    { state: "loading", label: "Loading", Icon: Clock3 },
+    { state: "attention", label: "Needs attention", Icon: TriangleAlert },
+    { state: "completed", label: "Completed", Icon: CheckCircle2 },
+  ];
   return (
-    <div className="operations loader-live">
-      <header>
-        <div>
-          <strong>WAYPOINT · Loader</strong>
-          <span>
-            {user?.name} · {user?.depotId ?? "No depot assigned"}
-          </span>
-        </div>
-        <button onClick={logout}>Sign out</button>
-      </header>
-      <main>
-        <nav aria-label="Loader navigation">
-          <Link to="/">Loading queue</Link>
-          <Link to="/issues">Issues</Link>
-          <Link to="/completed">Completed loads</Link>
-          <Link to="/settings">Profile</Link>
-        </nav>
-        <div className="ops-heading">
-          <h1>
-            {view === "issues"
-              ? "Loading issues"
-              : view === "completed"
-                ? "Completed loads"
-                : view === "settings"
-                  ? "Loader profile"
-                  : "Loading queue"}
-          </h1>
-          <button disabled={busy} onClick={() => void refresh()}>
-            Refresh
-          </button>
-        </div>
-        {view === "settings" ? (
-          <section className="ops-card">
-            <h2>{user?.name}</h2>
-            <p>{user?.email}</p>
-            <p>Assigned depot: {user?.depotId ?? "Not assigned"}</p>
-          </section>
-        ) : (
-          <>
-            <div className="loader-filters">
-              <label>
-                Run date
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                />
-              </label>
-              <label>
-                Search trips
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Vehicle, outlet or status"
-                />
-              </label>
+    <LoaderShell
+      issueCount={
+        loads.flatMap((l) => l.issues).filter((i) => i.status !== "RESOLVED")
+          .length
+      }
+    >
+      {view === "settings" ? (
+        <Settings />
+      ) : (
+        <div className="loader-page">
+          <div className="loader-heading">
+            <div>
+              <h1>{titles[view]}</h1>
+              <p>{descriptions[view]}</p>
             </div>
-            {busy && <p role="status">Refreshing loading work…</p>}
-            {error && (
-              <p role="alert">{error} Refresh before making changes.</p>
+            <span className="loader-workspace-badge">
+              ● &nbsp; Loader workspace
+            </span>
+          </div>
+          {view === "queue" && (
+            <section className="loader-metrics" aria-label="Queue overview">
+              {metrics.map(({ state, label, Icon }) => (
+                <button
+                  key={state}
+                  className={`loader-metric ${state}`}
+                  onClick={() => setFilter(state)}
+                  aria-label={`Filter ${label}`}
+                >
+                  <span>
+                    <Icon size={18} />
+                  </span>
+                  <strong>
+                    {loads.filter((l) => displayState(l) === state).length}
+                  </strong>
+                  <small>{label}</small>
+                </button>
+              ))}
+            </section>
+          )}
+          <div className="loader-toolbar">
+            {view === "queue" && (
+              <div
+                className="loader-tabs"
+                role="group"
+                aria-label="Filter loading queue"
+              >
+                {["all", "ready", "loading", "attention", "completed"].map(
+                  (state) => (
+                    <button
+                      key={state}
+                      aria-pressed={filter === state}
+                      onClick={() => setFilter(state)}
+                    >
+                      {state[0].toUpperCase() + state.slice(1)}
+                    </button>
+                  ),
+                )}
+              </div>
             )}
-            {!busy && !error && !visible.length && (
-              <p>No published loads match this view.</p>
-            )}
+            <label className="loader-search">
+              <span className="sr-only">Search trips</span>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search vehicle, trip, outlet, or status"
+              />
+            </label>
+          </div>
+          <div className="loader-run-controls">
+            <label>
+              Run date{" "}
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                disabled={view === "trip"}
+              />
+            </label>
+            <button disabled={busy} onClick={() => void refresh()}>
+              Refresh
+            </button>
+          </div>
+          {busy && (
+            <p role="status" className="loader-message">
+              Refreshing loading work…
+            </p>
+          )}
+          {error && (
+            <p role="alert" className="loader-message loader-error">
+              {error} Refresh before making changes.
+            </p>
+          )}
+          {!busy && !error && !visible.length && (
+            <div className="loader-empty">
+              <span>
+                {view === "completed" ? (
+                  <ClipboardCheck />
+                ) : view === "issues" ? (
+                  <CheckCircle2 />
+                ) : (
+                  <Truck />
+                )}
+              </span>
+              <h2>
+                {search || (filter !== "all" && view === "queue")
+                  ? "No matching loads"
+                  : view === "completed"
+                    ? "No completed loads"
+                    : view === "issues"
+                      ? "No loading issues"
+                      : "No published loading trips"}
+              </h2>
+              <p>
+                {view === "completed"
+                  ? "Completed loading trips for your depot will appear here."
+                  : view === "issues"
+                    ? "Missing, damaged, and replacement records will appear here when they are recorded during loading."
+                    : "Trips published by the Dispatcher for your depot will appear here. Check the run date or refresh for the latest work."}
+              </p>
+              {view !== "queue" && <Link to="/">Back to Loading Queue</Link>}
+            </div>
+          )}
+          <div className="operations loader-live">
             <fieldset className="loader-work" disabled={busy || !!error}>
               {visible.map((load) => (
                 <LoadCard
@@ -187,12 +278,18 @@ function LoaderScreen({
                 />
               ))}
             </fieldset>
-          </>
-        )}
-      </main>
-    </div>
+          </div>
+        </div>
+      )}
+    </LoaderShell>
   );
 }
+function displayState(load: LoadingView) {
+  if (queueState(load) === "completed") return "completed";
+  if (queueState(load) === "issues") return "attention";
+  return load.trip.status === "LOADING" ? "loading" : "ready";
+}
+
 function LoadCard({
   load,
   call,

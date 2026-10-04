@@ -47,6 +47,8 @@ function useDriverState(integration?: DriverIntegration, user?: {name: string; e
   };
   return {
     identity: { ...(snapshot?.assignment ?? (integration ? { ...DRIVER, vehicle: 'Assignment unavailable', vehicleType: '', depot: '' } : DRIVER)), name: user?.name ?? snapshot?.assignment?.name ?? 'Demo driver', email: user?.email ?? snapshot?.assignment?.email ?? 'Demo account', date: new Date().toLocaleDateString('en-GB', { timeZone: 'Asia/Colombo' }) },
+    refreshError: snapshot?.refreshError,
+    sync: async () => { try { await integration?.sync?.(); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Sync failed.'); } },
     trips, connection: connection === 'online' && actions.some(a => a.state === 'Syncing') ? 'syncing' as const : connection, loaderFlagsAcknowledged, departedTrips, stopRecords, actions, error, issueReports,
     demoMode: !integration, offlineSince: connection === 'offline' ? 'network unavailable' : null,
     lastSyncedAt: snapshot?.lastSyncedAt ?? 'Never — demo data',

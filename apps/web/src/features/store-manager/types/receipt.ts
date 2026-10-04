@@ -4,6 +4,7 @@ export interface PhotoAttachment {
   id: string;
   url: string;
   name: string;
+  file?: File;
 }
 
 export interface ItemCheck {

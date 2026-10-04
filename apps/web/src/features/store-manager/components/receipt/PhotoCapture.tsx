@@ -1,4 +1,5 @@
-import React, { ChangeEvent, useRef } from 'react';
+import { toast } from 'sonner';
+import { ChangeEvent, useRef, useEffect } from 'react';
 import { CameraIcon, UploadIcon, XIcon } from 'lucide-react';
 import type { PhotoAttachment } from '../../types/receipt';
 import { buttonStyles } from '../ui/Button';
@@ -10,15 +11,20 @@ interface PhotoCaptureProps {
 }
 
 export function PhotoCapture({ photos, onChange, itemName }: PhotoCaptureProps) {
+  const urls = useRef(new Set<string>());
+  useEffect(() => () => urls.current.forEach(URL.revokeObjectURL), []);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFiles = (e: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
+    if (files.some(f => !['image/png','image/jpeg','image/webp'].includes(f.type) || f.size > 10 * 1024 * 1024) || files.length + photos.length > 20) { toast.error('Choose up to 20 PNG, JPEG or WebP photos, each under 10 MiB.'); return; }
     const added = files.map((f) => ({
+      file: f,
       id: `${f.name}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       url: URL.createObjectURL(f),
       name: f.name
     }));
+    added.forEach(p => urls.current.add(p.url));
     onChange([...photos, ...added]);
     e.target.value = '';
   };
@@ -32,7 +38,7 @@ export function PhotoCapture({ photos, onChange, itemName }: PhotoCaptureProps) 
   return (
     <div>
       <p className="text-sm font-semibold text-ink">
-        Photos <span className="font-normal text-subtle">(optional — add as many as needed)</span>
+        Photos <span className="font-normal text-subtle">(optional — up to 20 photos)</span>
       </p>
       <div className="mt-2 flex flex-wrap items-center gap-3">
         {photos.map((p, i) =>
@@ -58,7 +64,7 @@ export function PhotoCapture({ photos, onChange, itemName }: PhotoCaptureProps) 
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept="image/png,image/jpeg,image/webp"
         capture="environment"
         multiple
         onChange={handleFiles}

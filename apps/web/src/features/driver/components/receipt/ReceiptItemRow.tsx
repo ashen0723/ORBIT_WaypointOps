@@ -1,4 +1,3 @@
-import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CheckIcon, TriangleAlertIcon } from 'lucide-react';
 import type { OrderItem } from '../../types/orders';

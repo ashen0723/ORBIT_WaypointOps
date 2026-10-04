@@ -1,4 +1,3 @@
-import React from 'react';
 import { CheckIcon, MapPinnedIcon, SnowflakeIcon, StoreIcon, TruckIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useDriver } from '../../contexts/DriverContext';

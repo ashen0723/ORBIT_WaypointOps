@@ -1,4 +1,3 @@
-import React from 'react';
 import type { OrderStatus } from '../../types/orders';
 import { STATUS_CONFIG } from '../../utils/status';
 

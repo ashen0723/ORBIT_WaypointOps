@@ -1,4 +1,3 @@
-import React from 'react';
 import { CheckIcon, PackageIcon, SnowflakeIcon } from 'lucide-react';
 import type { OrderType } from '../../types/orders';
 

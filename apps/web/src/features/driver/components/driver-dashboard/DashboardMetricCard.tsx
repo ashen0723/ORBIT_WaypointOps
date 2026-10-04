@@ -1,4 +1,3 @@
-import React from 'react';
 import { ArrowUpRightIcon } from 'lucide-react';
 
 type Tone = 'forest' | 'surface' | 'mint' | 'amber';
