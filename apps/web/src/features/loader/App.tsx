@@ -1,71 +1,293 @@
 import React from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+
+import {
+  BrowserRouter,
+  Link,
+  Navigate,
+  Route,
+  Routes,
+} from 'react-router-dom';
+
+import {
+  ClipboardCheckIcon,
+  TruckIcon,
+} from 'lucide-react';
+
 import { Toaster } from 'sonner';
-import { OrdersProvider } from './contexts/OrdersContext';
-import { CutoffProvider } from './contexts/CutoffContext';
+
 import { AppShell } from './components/layout/AppShell';
-import { PlaceOrder } from './pages/PlaceOrder';
-import { OrderConfirmation } from './pages/OrderConfirmation';
-import { OrderStatus } from './pages/OrderStatus';
-import { DeferralNotice } from './pages/DeferralNotice';
-import { ConfirmReceipt } from './pages/ConfirmReceipt';
-import { OrderHistory } from './pages/OrderHistory';
-import { Settings } from './pages/Settings';
-import { DashboardLab } from './pages/DashboardLab';
+
 import { LoadingQueue } from './pages/LoadingQueue';
 import { VehicleLoadDetail } from './pages/VehicleLoadDetail';
+
 import { StopSequence } from './pages/StopSequence';
 import { UpdatedStopSequence } from './pages/UpdatedStopSequence';
-import { LoadingIssue } from './pages/LoadingIssue';
-import { CompletedLoad } from './pages/CompletedLoad';
+
 import { LoaderIssues } from './pages/LoaderIssues';
-import { QueueLoadDetail } from './pages/QueueLoadDetail';
+
+import { CompletedLoad } from './pages/CompletedLoad';
 import { QueueCompletedLoad } from './pages/QueueCompletedLoad';
+
+import { Settings } from './pages/Settings';
+
 import { LoaderProvider } from './contexts/LoaderContext';
-import { CUTOFF_SCENARIO_SECONDS } from './data/schedule';
+import { useLoader } from './contexts/LoaderContext';
+
+import { PageContainer } from './components/ui/PageContainer';
+import { PageHeader } from './components/ui/PageHeader';
+import { Card } from './components/ui/Card';
+import { buttonStyles } from './components/ui/Button';
+
 interface AppProps {
-  cutoffScenario?: 'normal' | 'under_hour' | 'past';
   basename?: string;
 }
+
 export function App({
-  cutoffScenario = 'normal',
-  basename
+  basename,
 }: AppProps) {
-  return <OrdersProvider>
-      <CutoffProvider initialSeconds={CUTOFF_SCENARIO_SECONDS[cutoffScenario]}>
-        <LoaderProvider>
-          <BrowserRouter basename={basename}>
-            <Routes>
-              <Route element={<AppShell />}>
-                <Route index element={<Navigate to="/loader" replace />} />
-                <Route path="loader" element={<LoadingQueue />} />
-                <Route path="loader/issues" element={<LoaderIssues />} />
-                <Route path="loader/veh014" element={<VehicleLoadDetail />} />
-                <Route path="loader/veh014/stops" element={<StopSequence />} />
-                <Route path="loader/:vehicleId/stops/updated" element={<UpdatedStopSequence />} />
-                <Route path="loader/veh014/issue/:itemId" element={<LoadingIssue />} />
-                <Route path="loader/veh014/issue" element={<LoadingIssue />} />
-                <Route path="loader/veh014/complete" element={<CompletedLoad />} />
-                <Route path="loader/:vehicleId/complete" element={<QueueCompletedLoad />} />
-                <Route path="loader/:vehicleId" element={<QueueLoadDetail />} />
-                <Route path="dashboard" element={<DashboardLab />} />
-                <Route path="place-order" element={<PlaceOrder />} />
-                <Route path="history" element={<OrderHistory />} />
-                <Route path="settings" element={<Settings />} />
-                <Route path="orders/:orderId" element={<OrderStatus />} />
-                <Route path="orders/:orderId/confirmation" element={<OrderConfirmation />} />
-                <Route path="orders/:orderId/deferral" element={<DeferralNotice />} />
-                <Route path="orders/:orderId/receipt" element={<ConfirmReceipt />} />
-                <Route path="*" element={<Navigate to="/loader" replace />} />
-              </Route>
-            </Routes>
-          </BrowserRouter>
-          <Toaster position="top-center" toastOptions={{
+  return (
+    <LoaderProvider>
+      <BrowserRouter basename={basename}>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route
+              index
+              element={<LoadingQueue />}
+            />
+
+            <Route
+              path="issues"
+              element={<LoaderIssues />}
+            />
+
+            <Route
+              path="settings"
+              element={<Settings />}
+            />
+
+            <Route
+              path="completed"
+              element={<CompletedLoadsIndex />}
+            />
+
+            <Route
+              path="completed/:tripId"
+              element={<QueueCompletedLoad />}
+            />
+
+            <Route
+              path="trips/:tripId"
+              element={<VehicleLoadDetail />}
+            />
+
+            <Route
+              path="trips/:tripId/stops"
+              element={<StopSequence />}
+            />
+
+            <Route
+              path="trips/:tripId/stops/updated"
+              element={<UpdatedStopSequence />}
+            />
+
+            <Route
+              path="trips/:tripId/complete"
+              element={<CompletedLoad />}
+            />
+
+            <Route
+              path="*"
+              element={
+                <Navigate
+                  to="/"
+                  replace
+                />
+              }
+            />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+
+      <Toaster
+        position="top-center"
+        toastOptions={{
           style: {
-            fontFamily: 'Inter, sans-serif'
-          }
-        }} />
-        </LoaderProvider>
-      </CutoffProvider>
-    </OrdersProvider>;
+            fontFamily:
+              'Inter, sans-serif',
+          },
+        }}
+      />
+    </LoaderProvider>
+  );
+}
+
+function CompletedLoadsIndex() {
+  const {
+    queueLoads,
+    handedOffVehicleIds,
+  } = useLoader();
+
+  const completedLoads =
+    queueLoads.filter(
+      (load) => {
+        if (!load.tripId) {
+          return false;
+        }
+
+        return (
+          load.status ===
+          'completed' ||
+          load.status ===
+          'loading_completed' ||
+          handedOffVehicleIds.includes(
+            load.tripId,
+          )
+        );
+      },
+    );
+
+  return (
+    <PageContainer>
+      <PageHeader
+        title="Completed Loads"
+        subtitle="Review loading records that have completed the Loader handoff."
+      />
+
+      {completedLoads.length >
+        0 ? (
+        <div className="mt-6 grid gap-4 xl:grid-cols-2">
+          {completedLoads.map(
+            (load) => (
+              <Card
+                key={
+                  load.tripId
+                }
+                className="flex flex-col p-5 md:p-6"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[28px] font-semibold leading-none tabular-nums tracking-tight text-ink">
+                      {
+                        load.vehicleId
+                      }
+                    </p>
+
+                    <p className="mt-2 font-semibold text-ink">
+                      {load.trip}
+                    </p>
+
+                    <p className="mt-1 text-sm text-subtle">
+                      {
+                        load.brand
+                      }
+                      {' · '}
+                      {
+                        load.district
+                      }
+                    </p>
+                  </div>
+
+                  <span className="rounded-full bg-brand-pale px-3 py-1.5 text-xs font-semibold text-forest ring-1 ring-inset ring-brand/20">
+                    Loading
+                    completed
+                  </span>
+                </div>
+
+                <dl className="mt-5 grid grid-cols-3 gap-3 border-y border-line py-4">
+                  <CompletedMeta
+                    label="Planned departure"
+                    value={
+                      load.departure
+                    }
+                  />
+
+                  <CompletedMeta
+                    label="Stops"
+                    value={String(
+                      load.stops,
+                    )}
+                  />
+
+                  <CompletedMeta
+                    label="Orders"
+                    value={String(
+                      load.orderCount,
+                    )}
+                  />
+                </dl>
+
+                <Link
+                  to={`/completed/${encodeURIComponent(
+                    load.tripId!,
+                  )}`}
+                  className={`${buttonStyles(
+                    'secondary',
+                    'md',
+                  )} mt-5`}
+                >
+                  View Load
+                </Link>
+              </Card>
+            ),
+          )}
+        </div>
+      ) : (
+        <Card className="mt-6 p-8 text-center">
+          <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-brand-pale text-forest">
+            <ClipboardCheckIcon
+              aria-hidden="true"
+              className="h-6 w-6"
+            />
+          </span>
+
+          <h2 className="mt-4 text-lg font-semibold text-ink">
+            No completed
+            loads
+          </h2>
+
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-subtle">
+            Completed loading
+            trips for this
+            Loader&apos;s depot
+            will appear here.
+          </p>
+
+          <Link
+            to="/"
+            className={`${buttonStyles(
+              'secondary',
+              'md',
+            )} mt-5`}
+          >
+            <TruckIcon
+              aria-hidden="true"
+              className="h-4 w-4"
+            />
+
+            Loading Queue
+          </Link>
+        </Card>
+      )}
+    </PageContainer>
+  );
+}
+
+function CompletedMeta({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div>
+      <dt className="text-xs font-medium text-subtle">
+        {label}
+      </dt>
+
+      <dd className="mt-1 text-sm font-semibold tabular-nums text-ink">
+        {value}
+      </dd>
+    </div>
+  );
 }
