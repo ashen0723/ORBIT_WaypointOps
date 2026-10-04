@@ -30,7 +30,7 @@ export function NotificationsMenu() {
   const notes = orders.flatMap((o) => {
     if (o.status === 'deferred' && o.deferral)
     return [{ id: o.id, Icon: TriangleAlertIcon, tone: 'bg-amber-pale text-amber-ink', title: `${o.id} deferred`, body: `Moved to ${formatDate(o.deferral.newDate)}`, to: `/orders/${o.id}/deferral` }];
-    if (o.status === 'delivered' && o.deliveredAt)
+    if (o.status === 'delivered' && o.deliveredAt && !o.receiptConfirmed)
     return [{ id: o.id, Icon: PackageCheckIcon, tone: 'bg-brand-pale text-forest', title: `${o.id} delivered`, body: `Arrived ${formatTime24(o.deliveredAt)} — confirm receipt`, to: `/orders/${o.id}/receipt` }];
     if (o.status === 'in_transit' && o.eta)
     return [{ id: o.id, Icon: TruckIcon, tone: 'bg-brand-mint/30 text-forest', title: `${o.id} is on the way`, body: `Expected ${formatTime24(o.eta)}`, to: `/orders/${o.id}` }];

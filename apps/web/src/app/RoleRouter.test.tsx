@@ -35,7 +35,7 @@ describe('RoleRouter', () => {
     window.history.pushState(null, '', '/store');
 
     // Mounting with the session already present is what a page reload does.
-    render(<RoleRouter role="store_manager" userId="USR-STR" modules={modules} login={<p>login</p>} />);
+    render(<RoleRouter role="store_manager" userId="USR-STR" modules={modules} login={<p>login</p>} landing={<p>landing</p>} />);
     expect(screen.getByText('store_manager-home')).toBeTruthy();
 
     // history.back() is asynchronous: wait for the popstate to be delivered, then let React flush.
@@ -50,8 +50,15 @@ describe('RoleRouter', () => {
 
   it('shows login when signed out on a role path', () => {
     window.history.replaceState(null, '', '/dispatcher/orders');
-    render(<RoleRouter role={null} userId={null} modules={modules} login={<p>login</p>} />);
+    render(<RoleRouter role={null} userId={null} modules={modules} login={<p>login</p>} landing={<p>landing</p>} />);
     expect(screen.getByText('login')).toBeTruthy();
     expect(window.location.pathname).toBe('/login');
+  });
+
+  it('shows the landing page when signed out at the root', () => {
+    window.history.replaceState(null, '', '/');
+    render(<RoleRouter role={null} userId={null} modules={modules} login={<p>login</p>} landing={<p>landing</p>} />);
+    expect(screen.getByText('landing')).toBeTruthy();
+    expect(window.location.pathname).toBe('/');
   });
 });

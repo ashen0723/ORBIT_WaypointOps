@@ -17,6 +17,8 @@ export interface OrderItem {
   name: string;
   qty: number;
   unit: Unit;
+  /** Quantity handed over on the delivery attempt being receipted. */
+  deliveredQty?: number;
 }
 
 export interface Deferral {
@@ -38,6 +40,8 @@ export interface VehicleInfo {
 export interface ProofOfDelivery {
   receivedBy: string;
   location: string;
+  photoRef?: string | null;
+  signatureRef?: string | null;
 }
 
 export interface Order {
@@ -54,9 +58,14 @@ export interface Order {
   vehicle?: VehicleInfo;
   pod?: ProofOfDelivery;
   events?: Partial<Record<TimelineStep, string>>;
+  deliveryId?: string;
+  deliveryVersion?: number;
+  receiptConfirmed?: boolean;
+  recoveryPending?: boolean;
 }
 
 export interface CatalogItem {
+  id?: string;
   name: string;
   brand: Brand;
   type: OrderType;

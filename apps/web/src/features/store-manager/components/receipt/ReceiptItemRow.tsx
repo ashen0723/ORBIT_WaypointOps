@@ -10,6 +10,7 @@ interface ReceiptItemRowProps {
   check: ItemCheck;
   showErrors: boolean;
   onChange: (check: ItemCheck) => void;
+  live?: boolean;
 }
 
 const ISSUE_TYPES: {value: IssueType;label: string;}[] = [
@@ -18,12 +19,13 @@ const ISSUE_TYPES: {value: IssueType;label: string;}[] = [
 { value: 'wrong_item', label: 'Wrong item' }];
 
 
-export function ReceiptItemRow({ item, check, showErrors, onChange }: ReceiptItemRowProps) {
+export function ReceiptItemRow({ item, check, showErrors, onChange, live = false }: ReceiptItemRowProps) {
   const isOk = check.result === 'ok';
   const isIssue = check.result === 'issue';
   const typeError = showErrors && isIssue && !check.issueType;
   const descError = showErrors && isIssue && !check.description.trim();
   const unmarked = showErrors && check.result === null;
+  const deliveredQty = item.deliveredQty ?? item.qty;
   const descId = `desc-${item.id}`;
 
   return (
@@ -32,7 +34,7 @@ export function ReceiptItemRow({ item, check, showErrors, onChange }: ReceiptIte
         <div className="min-w-0">
           <p className="font-medium text-ink">{item.name}</p>
           <p className="text-sm text-subtle">
-            {item.qty} {item.unit} ordered
+            {item.qty} {item.unit} ordered{live ? ` · ${deliveredQty} handed over` : ''}
           </p>
           {unmarked && <p className="mt-1 text-xs font-medium text-danger-ink">Mark this item as received or flag an issue</p>}
         </div>
@@ -79,7 +81,7 @@ export function ReceiptItemRow({ item, check, showErrors, onChange }: ReceiptIte
                   Issue type <span className="text-danger-ink">*</span>
                 </legend>
                 <div className="mt-2 grid gap-2 sm:flex sm:flex-wrap">
-                  {ISSUE_TYPES.map((t) => {
+                  {ISSUE_TYPES.filter(t => !live || t.value !== 'wrong_item').map((t) => {
                   const selected = check.issueType === t.value;
                   return (
                     <label
@@ -104,6 +106,17 @@ export function ReceiptItemRow({ item, check, showErrors, onChange }: ReceiptIte
                 {typeError && <p className="mt-1 text-xs font-medium text-danger-ink">Choose an issue type</p>}
               </fieldset>
 
+              {live && <div>
+                <p className="text-sm font-semibold text-ink">Count the {deliveredQty} handed-over units</p>
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  {(['acceptedQty', 'damagedQty', 'missingQty'] as const).map(field => <label key={field} className="text-xs text-subtle">
+                    {field === 'acceptedQty' ? 'Accepted' : field === 'damagedQty' ? 'Damaged' : 'Missing'}
+                    <input type="number" min={0} step={1} value={check[field]} onChange={event => onChange({ ...check, [field]: event.target.value })} className="mt-1 h-10 w-full rounded-lg border border-line bg-surface px-2 text-ink" />
+                  </label>)}
+                </div>
+                <p className="mt-1 text-xs text-subtle">The three quantities must total {deliveredQty}.</p>
+              </div>}
+
               <div>
                 <label htmlFor={descId} className="text-sm font-semibold text-ink">
                   Describe the issue <span className="text-danger-ink">*</span>
@@ -123,7 +136,7 @@ export function ReceiptItemRow({ item, check, showErrors, onChange }: ReceiptIte
                 {descError && <p className="mt-1 text-xs font-medium text-danger-ink">Describe what’s wrong so dispatch can act on it</p>}
               </div>
 
-              <PhotoCapture photos={check.photos} onChange={(photos) => onChange({ ...check, photos })} itemName={item.name} />
+              {live ? <p className="text-xs text-subtle">Photo upload will be available when the attachment service is connected.</p> : <PhotoCapture photos={check.photos} onChange={(photos) => onChange({ ...check, photos })} itemName={item.name} />}
             </div>
           </motion.div>
         }

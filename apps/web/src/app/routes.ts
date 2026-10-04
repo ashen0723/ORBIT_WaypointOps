@@ -4,7 +4,7 @@ export interface RouteDecision {
   /** Path to replace the current URL with before rendering, or null to stay. */
   redirectTo: string | null;
   /** Which tree the root should render: the login screen or one role's module. */
-  module: Role | 'login';
+  module: Role | 'login' | 'landing';
 }
 
 function isInside(pathname: string, base: string): boolean {
@@ -14,6 +14,7 @@ function isInside(pathname: string, base: string): boolean {
 /** Decide what the root renders for the signed-in role (or null when signed out) and the current path. */
 export function resolveRoute(role: Role | null, pathname: string): RouteDecision {
   if (!role) {
+    if (pathname === '/') return { redirectTo: null, module: 'landing' };
     return { redirectTo: pathname === LOGIN_PATH ? null : LOGIN_PATH, module: 'login' };
   }
   const base = ROLE_BASE_PATH[role];

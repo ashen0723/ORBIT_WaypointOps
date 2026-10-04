@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { resolveRoute } from './routes';
 
 describe('resolveRoute', () => {
-  it('sends a signed-out visitor at the root to login', () => {
-    expect(resolveRoute(null, '/')).toEqual({ redirectTo: '/login', module: 'login' });
+  it('shows the landing page to a signed-out visitor at the root', () => {
+    expect(resolveRoute(null, '/')).toEqual({ redirectTo: null, module: 'landing' });
   });
 
   it('sends a signed-out visitor on a role path to login', () => {

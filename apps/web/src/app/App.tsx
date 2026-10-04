@@ -1,17 +1,24 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { LOGIN_PATH } from '@waypoint/contracts';
-import { AuthProvider, useAuth } from './providers/AuthProvider';
-import { RoleRouter, type RoleModules } from './RoleRouter';
-import { Login } from '../features/dispatcher/pages/Login';
-import { DispatcherApp } from '../features/dispatcher/live/DispatcherApp';
-import { App as LoaderApp } from '../features/loader/App';
-import { OperationsApp } from '../features/operations/OperationsApp';
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { LOGIN_PATH } from "@waypoint/contracts";
+import { AuthProvider, useAuth } from "./providers/AuthProvider";
+import { RoleRouter, type RoleModules } from "./RoleRouter";
+import { Login } from "./pages/Login";
+import { Landing } from "./pages/Landing";
+import { DispatcherApp } from "../features/dispatcher/live/DispatcherApp";
+import { App as LoaderApp } from "../features/loader/App";
+import { OperationsApp } from "../features/operations/OperationsApp";
 
-const ROLE_MODULES: RoleModules = { dispatcher: DispatcherApp, store_manager: OperationsApp, loader: LoaderApp, driver: OperationsApp };
+const ROLE_MODULES: RoleModules = {
+  dispatcher: DispatcherApp,
+  store_manager: OperationsApp,
+  loader: LoaderApp,
+  driver: OperationsApp,
+};
 
-const LOGIN_TREE = (
+const PUBLIC_TREE = (
   <BrowserRouter>
     <Routes>
+      <Route path="/" element={<Landing />} />
       <Route path={LOGIN_PATH} element={<Login />} />
       <Route path="*" element={<Navigate to={LOGIN_PATH} replace />} />
     </Routes>
@@ -20,7 +27,15 @@ const LOGIN_TREE = (
 
 function SessionRoleRouter() {
   const { user } = useAuth();
-  return <RoleRouter role={user?.role ?? null} userId={user?.id ?? null} modules={ROLE_MODULES} login={LOGIN_TREE} />;
+  return (
+    <RoleRouter
+      role={user?.role ?? null}
+      userId={user?.id ?? null}
+      modules={ROLE_MODULES}
+      login={PUBLIC_TREE}
+      landing={PUBLIC_TREE}
+    />
+  );
 }
 
 export function App() {
