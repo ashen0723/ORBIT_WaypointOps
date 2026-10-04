@@ -91,6 +91,61 @@ module.exports = async ({ db, request, base, tokens }) => {
     "GET",
     400,
   );
+  // Driver additions authenticate identity and never trust a caller-selected user.
+  for (const path of [
+    "/users/driver/driver/profile",
+    "/trips/driver/driver/today",
+    "/sync/actions/missing",
+  ]) {
+    await request(path, undefined, "anonymous", "GET", 401);
+    await request(path, undefined, "store", "GET", 403);
+  }
+  await request(
+    "/users/driver/driver/profile",
+    undefined,
+    "foreign-driver",
+    "GET",
+    403,
+  );
+  await request(
+    "/trips/driver/driver/today",
+    undefined,
+    "foreign-driver",
+    "GET",
+    403,
+  );
+  const driverProfile = await request(
+    "/users/driver/driver/profile",
+    undefined,
+    "driver",
+    "GET",
+  );
+  assert.equal(driverProfile.id, "driver");
+  assert.equal(driverProfile.vehicle.id, "LIVE-V");
+  assert.equal(driverProfile.passwordHash, undefined);
+  const today = await request(
+    `/trips/driver/driver/today?date=${days[0]}`,
+    undefined,
+    "driver",
+    "GET",
+  );
+  assert.equal(
+    today.date,
+    new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10),
+  );
+  assert.ok(today.items.every((t) => t.date === today.date));
+  assert.deepEqual(
+    await request("/trips/order/O/delivery", undefined, "store", "GET"),
+    await request("/orders/O/deliveries", undefined, "store", "GET"),
+  );
+  await request(
+    "/trips/order/O/delivery",
+    undefined,
+    "foreign-store",
+    "GET",
+    403,
+  );
+  await request("/sync/actions/missing", undefined, "driver", "GET", 404);
   const createdBody = mutation({
     requestedDate: days[0],
     temp: "CHILLED",
@@ -397,6 +452,40 @@ module.exports = async ({ db, request, base, tokens }) => {
     ],
   };
   const synced = await request("/sync/actions", actions, "driver");
+  const storedAction = await request(
+    `/sync/actions/${actions.actions[0].request.clientActionId}`,
+    undefined,
+    "driver",
+    "GET",
+  );
+  assert.equal(
+    storedAction.clientActionId,
+    actions.actions[0].request.clientActionId,
+  );
+  assert.equal(storedAction.result.status, "SYNCED");
+  assert.equal(storedAction.requestHash, undefined);
+  await request(
+    `/sync/actions/${actions.actions[0].request.clientActionId}`,
+    undefined,
+    "foreign-driver",
+    "GET",
+    404,
+  );
+  const progress = await request(
+    `/trips/${trip.id}/delivery-progress`,
+    undefined,
+    "dispatcher",
+    "GET",
+  );
+  assert.equal(progress.completedStops, 1);
+  assert.equal(progress.remainingStops, 0);
+  await request(
+    `/trips/${trip.id}/delivery-progress`,
+    undefined,
+    "driver",
+    "GET",
+    403,
+  );
   assert.ok(synced.results.every((r) => r.status === "SYNCED"));
   const replay = await request("/sync/actions", actions, "driver");
   assert.ok(replay.results.every((r) => r.status === "SYNCED" && r.replayed));

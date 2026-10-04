@@ -1,15 +1,14 @@
 # Remaining PR integration order
 
-Reviewed with main `1d8d93d`: #2, #4, #8, #5, #6, #10 and #9 are merged.
+Reviewed with main `0cf2ac6`: #2, #4, #8, #5, #6, #10, #9 and #13 are merged.
 No remote PRs were merged or closed during this review.
 
 | Order | PR / branch | Required work before merge |
 |---|---|---|
-| 1 | #13 `feature/storeManager` | Prepared locally: preserve main schema/auth and canonical order/receipt mutations; add scoped outlet/policy/queue/catalog endpoints. |
-| 2 | #11 `feature/mansandi` | Reconcile UsersService and trip/delivery/sync route ownership; preserve auth scope, evidence and replay/conflict semantics. |
-| 3 | #12 `loader` | Reconcile schema/client and Loader API/UI, mount and test the live entry point. |
-| 4 | #7 `vihandu` | Connect DriverIntegration to the backend and durable outbox before replacing the mounted Driver flow. |
-| 5 | #3 `mansi` | Separate unique landing/login/Store UI from duplicated auth/schema/importer/backend changes. |
+| 1 | #11 `feature/mansandi` | Prepared locally: guarded Driver reads, canonical delivery/sync ownership, actor-scoped action lookup; preserve versions, evidence and replay/conflict semantics. |
+| 2 | #12 `loader` | Reconcile schema/client and Loader API/UI, mount and test the live entry point. |
+| 3 | #7 `vihandu` | Connect DriverIntegration to canonical backend contracts and durable outbox before replacing the mounted Driver flow. |
+| 4 | #3 `mansi` | Separate unique landing/login/Store UI from duplicated auth/schema/importer/backend changes. |
 
 Main already contains #9's duplicate Fleet `/vehicles` route and unguarded detail handler. Its merge status does not establish contract/security reconciliation; schedule a follow-up to unify these with the guarded paginated workflow fleet projection.
 
@@ -36,3 +35,12 @@ four-role and Dispatcher flows. Store alias/auth/outlet/policy checks run in the
 suite, alongside partial receipts and recovery. Fresh Prisma migration deployment and
 seed/importer replay also passed against a disposable database. Changes are staged on
 `feature/storeManager`; no commit, push or remote merge was performed.
+
+## #11 verification
+
+The Driver reconciliation passed 196 tests (153 API, 43 web), contract/live frontend and
+Prisma type checks, both production builds, and disposable PostgreSQL + Chromium four-role
+and Dispatcher flows. New real HTTP assertions cover authenticated Driver reads, outlet
+scope, action ownership and progress. The unchanged canonical flows also verify partial
+receipts/recovery, evidence, stale-plan conflicts and offline reload/replay. Changes are
+staged on `feature/mansandi`; no commit, push or remote merge was performed.
