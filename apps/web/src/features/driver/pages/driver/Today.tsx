@@ -42,7 +42,7 @@ export function Today() {
         </article>
         <div className="flex items-end justify-between gap-3 pt-2 md:order-first md:col-span-full md:pt-0">
           <h2 id="trips-heading" className="text-lg font-bold text-ink">Today's trips</h2>
-          <span className="text-sm font-semibold text-subtle">2 trips</span>
+          <span className="text-sm font-semibold text-subtle">{TRIPS.length} {TRIPS.length === 1 ? 'trip' : 'trips'}</span>
         </div>
         {TRIPS.length === 0 && <p role="status">No assigned released trips are available.</p>}
         {TRIPS.map((trip) => <TripCard key={trip.id} trip={trip} />)}
