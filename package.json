@@ -1,0 +1,19 @@
+{
+  "name": "orbit-waypoint",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Waypoint Group delivery operations platform — Tech-Triathlon 2026",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev:web": "npm run dev -w apps/web",
+    "dev:api": "npm run start:dev -w apps/api",
+    "build": "npm run build -w apps/web && npm run build -w apps/api",
+    "test": "npm test -w apps/web && npm test -w apps/api"
+  }
+}

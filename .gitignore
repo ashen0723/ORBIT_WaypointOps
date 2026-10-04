@@ -1,3 +1,17 @@
+# Private competition material (booklet, prototypes, PDFs) — never commit
+docs/_internal/
+
+# Local scratch space
+.superpowers/
+
+# Build output and generated code
+dist/
+apps/api/src/generated/
+
+# Local uploads (POD photos, signatures)
+apps/api/uploads/
+uploads/
+
 # Logs
 logs
 *.log
