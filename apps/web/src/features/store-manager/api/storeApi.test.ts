@@ -10,6 +10,7 @@ describe('Live Store integration', () => {
     expect(mapped.requestedDate).toBe('2026-10-06');
     expect(mapped.items[0].deliveredQty).toBe(6);
     expect(mapped.deliveryVersion).toBe(2);
+    expect(mapped.deliveredDate).toBe('2026-10-06');
     expect(mapped.pod?.signatureRef).toBe('E');
     expect(mapped.receiptConfirmed).toBe(false);
     expect(mapped.submittedAt).not.toContain('Invalid');

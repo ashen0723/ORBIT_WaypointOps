@@ -13,7 +13,9 @@ import { todayColombo } from '../api/storeApi';
 export function Home() {
   const { orders, store, live, loading, error } = useOrders();
   const today = live ? todayColombo() : TODAY;
-  const weekStart = live ? todayColombo(new Date(Date.now() - 7 * 86400000)) : WEEK_START;
+  const week = new Date(`${today}T00:00:00Z`);
+  week.setUTCDate(week.getUTCDate() - (week.getUTCDay() + 6) % 7);
+  const weekStart = live ? week.toISOString().slice(0, 10) : WEEK_START;
   const current = orders.filter((o) => o.requestedDate >= today || !['receipt_confirmed'].includes(o.status));
 
   const stats = [
@@ -34,7 +36,7 @@ export function Home() {
   },
   {
     label: 'Delivered This Week',
-    value: orders.filter((o) => (o.status === 'delivered' || o.status === 'receipt_confirmed') && o.requestedDate >= weekStart).length,
+    value: orders.filter((o) => (o.status === 'delivered' || o.status === 'receipt_confirmed') && (live ? Boolean(o.deliveredDate && o.deliveredDate >= weekStart && o.deliveredDate <= today) : o.requestedDate >= weekStart)).length,
     tone: 'surface' as const
   }];
 

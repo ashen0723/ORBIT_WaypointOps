@@ -6,4 +6,4 @@
 .store-manager-shell .text-forest { color: var(--store-forest); }
 .store-manager-shell h1, .store-manager-shell dd { overflow-wrap: anywhere; }
 @media (min-width: 1024px) { .store-manager-shell > aside { width: 248px; } }
-@media (max-width: 767px) { .store-manager-shell main { overflow-x: hidden; } }
+@media (max-width: 767px) { .store-manager-shell main { min-width: 0; } }

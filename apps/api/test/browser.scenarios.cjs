@@ -156,7 +156,7 @@ module.exports = async ({ db, base }) => {
       else
         await expect(
           page.getByRole("button", {
-            name: role === "loader" ? "Log out" : "Sign out",
+            name: role === "dispatcher" ? "Sign out" : "Log out",
           }),
         ).toBeVisible();
       if (role === "loader") {
@@ -196,24 +196,41 @@ module.exports = async ({ db, base }) => {
         );
         await page.setViewportSize({ width: 1280, height: 900 });
       }
+      if (role === "dispatcher")
+        await page.locator(".dispatch-scope-filters summary").click();
       if (role !== "store" && role !== "driver")
         await page.getByLabel("Run date", { exact: true }).fill(day);
     }
     const store = pages.store;
-    await store.getByLabel("Requested delivery date").fill(day);
-    await store.getByLabel("Item", { exact: true }).selectOption("CAT");
-    await store.getByLabel("Quantity", { exact: true }).fill("3");
-    await store.getByRole("button", { name: "Place order" }).click();
-    await expect(
-      store.getByText("requested 3, cancelled 0, accepted 0", { exact: false }),
-    ).toBeVisible();
-    const order = await db.order.findFirstOrThrow({
-      where: { plannedDate: new Date(day), units: 3 },
+    // Fixed-date order fixture for the cross-role workflow. Store UI creation and server-selected
+    // scheduling are covered separately by store-browser.scenarios.cjs.
+    const created = await store.evaluate(async (day) => {
+      const session = JSON.parse(
+        sessionStorage.getItem("waypoint.live.session"),
+      );
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.token}`,
+        },
+        body: JSON.stringify({
+          clientActionId: crypto.randomUUID(),
+          requestedDate: day,
+          temp: "CHILLED",
+          lines: [{ catalogItemId: "CAT", requestedQty: 3 }],
+        }),
+      });
+      if (!response.ok) throw new Error(await response.text());
+      return response.json();
+    }, day);
+    const order = await db.order.findUniqueOrThrow({
+      where: { id: created.order.id },
       include: { lines: true },
     });
     const dispatcher = pages.dispatcher;
     await dispatcher
-      .getByRole("link", { name: "Planning Workspace", exact: true })
+      .getByRole("link", { name: "Trip Planning", exact: true })
       .click();
     await dispatcher
       .getByLabel("Planning depot", { exact: true })
@@ -489,19 +506,26 @@ module.exports = async ({ db, base }) => {
       fullPage: true,
     });
     await driver.setViewportSize({ width: 1280, height: 900 });
-    await store.getByRole("button", { name: "Refresh", exact: true }).click();
-    const card = store
-      .locator("section")
-      .filter({ has: store.getByText(`Order ${order.id}`, { exact: true }) });
-    await card
-      .getByText("DELIVERED · Receipt pending", { exact: true })
+    await store.goto(`${url}/store/orders/${order.id}/receipt`);
+    await expect(
+      store.getByRole("heading", { name: "Confirm Receipt", exact: true }),
+    ).toBeVisible();
+    await store
+      .getByRole("button", { name: "Mark remaining as received OK" })
       .click();
-    await card
-      .getByRole("button", { name: "Confirm received quantities" })
+    await store
+      .getByRole("button", { name: "Confirm Receipt", exact: true })
       .click();
     await expect(
-      card.getByRole("heading", { name: "A · RECEIVED", exact: true }),
+      store.getByRole("heading", { name: order.id, exact: true }),
     ).toBeVisible();
+    await expect
+      .poll(
+        async () =>
+          (await db.order.findUniqueOrThrow({ where: { id: order.id } }))
+            .status,
+      )
+      .toBe("RECEIVED");
     assert.equal(
       await db.delivery.count({ where: { stop: { orderId: order.id } } }),
       1,

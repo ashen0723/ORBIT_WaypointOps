@@ -115,7 +115,11 @@ module.exports = async ({ db, base }) => {
     await page.setViewportSize({width:390,height:844});
     await expect(page.getByRole('heading',{name:'My Orders',exact:true})).toBeVisible();
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth),true);
-    await page.screenshot({path:'/private/tmp/waypoint-store-mobile.png',fullPage:true});
+    await page.screenshot({path:'/private/tmp/waypoint-store-mobile.png',fullPage:false});
+    await page.goto(url + '/store/orders/' + orderId + '/confirmation');
+    await expect(page.getByRole('heading',{name:'Order Confirmed',exact:true})).toBeVisible();
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth),true);
+    await page.screenshot({path:'/private/tmp/waypoint-store-confirmation-mobile.png'});
     assert.deepEqual(errors,[]);
     console.log('PASS: Store UI live login, scoped catalog, create, server date, persistence, details/history filters, receipt confirmation, mobile layout.');
   } finally { if(browser) await browser.close(); await new Promise(r => server.close(r)); }

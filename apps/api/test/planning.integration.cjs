@@ -155,6 +155,7 @@ async function main() {
     await require('./connected.scenarios.cjs')({ db, request, base, tokens });
     if (process.env.BROWSER_E2E === '1') await require('./browser.scenarios.cjs')({ db, base });
     if (process.env.STORE_BROWSER_E2E === '1') await require('./store-browser.scenarios.cjs')({ db, base });
+    if (process.env.DISPATCHER_UI_E2E === '1') await require('./dispatcher-ui.scenarios.cjs')({ db, base });
     // Database-level uniqueness survives code paths outside the service too.
     await assert.rejects(database.query('INSERT INTO "TripStop" ("id", "tripId", "orderId", "sequence", "updatedAt") VALUES ($1,$2,$3,99,now())', ['duplicate-stop', next.id, 'O2']), e => e.code === '23505');
     await assert.rejects(database.query('INSERT INTO "Trip" ("id", "vehicleId", "depotId", "date", "tripNo", "updatedAt") VALUES ($1,$2,$3,$4,1,now())', ['duplicate-trip', 'V', 'D', day]), e => e.code === '23505');

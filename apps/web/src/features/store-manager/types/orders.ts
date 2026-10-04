@@ -53,6 +53,7 @@ export interface Order {
   submittedAt: string;
   eta?: string;
   deliveredAt?: string;
+  deliveredDate?: string;
   items: OrderItem[];
   deferral?: Deferral;
   vehicle?: VehicleInfo;

@@ -1147,7 +1147,7 @@ function OrderHistory({
           />
           <p>
             {d.arrivedAt ? `Arrived ${clock(d.arrivedAt)} · ` : ""}Delivered {clock(d.capturedAt)}
-            {d.outcome !== "FAILED" ? ` · received by ${d.recorded.proof?.recipientName}` : ""} ·{" "}
+            {d.recorded.outcome !== "FAILED" ? ` · received by ${d.recorded.proof.recipientName}` : ""} ·{" "}
             {d.recorded.lines
               .map(
                 (l) =>

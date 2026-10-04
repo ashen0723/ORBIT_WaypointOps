@@ -3,7 +3,10 @@ const assert = require("node:assert/strict");
 const { randomUUID } = require("node:crypto");
 module.exports = async ({ db, base, url, pages, day }) => {
   const p = pages.dispatcher;
-  await p.getByRole("link", { name: "Operations Status", exact: true }).click();
+  await p
+    .getByRole("navigation", { name: "Dispatcher navigation" })
+    .getByRole("link", { name: "Delivery Monitoring", exact: true })
+    .click();
   await expect(
     p
       .getByRole("row")
@@ -84,7 +87,10 @@ module.exports = async ({ db, base, url, pages, day }) => {
     deferred = await create(1);
   await p.getByLabel("Run date", { exact: true }).fill(date);
   await p.getByLabel("Depot", { exact: true }).selectOption("D");
-  await p.getByRole("link", { name: "Orders Queue", exact: true }).click();
+  await p
+    .getByRole("navigation", { name: "Dispatcher navigation" })
+    .getByRole("link", { name: "Orders", exact: true })
+    .click();
   await p.getByLabel("Search orders").fill(a.id);
   await expect(
     p.getByRole("table", { name: "Orders queue" }).locator("tbody tr"),
@@ -99,12 +105,13 @@ module.exports = async ({ db, base, url, pages, day }) => {
   await expect(
     p.getByRole("button", { name: "Details", exact: true }),
   ).toBeFocused();
-  await p.getByRole("link", { name: "Vehicle List", exact: true }).click();
+  await p
+    .getByRole("navigation", { name: "Dispatcher navigation" })
+    .getByRole("link", { name: "Vehicles", exact: true })
+    .click();
   await p.getByLabel("Search vehicles").fill("BLOCKED-V");
   await expect(p.getByRole("table").locator("tbody tr")).toHaveCount(1);
-  await p
-    .getByRole("link", { name: "Planning Workspace", exact: true })
-    .click();
+  await p.getByRole("link", { name: "Trip Planning", exact: true }).click();
   await p.getByRole("button", { name: "New plan", exact: true }).click();
   await p.getByRole("button", { name: "Continue", exact: true }).click();
   await p.getByLabel("Planning depot", { exact: true }).selectOption("D");
@@ -209,7 +216,10 @@ module.exports = async ({ db, base, url, pages, day }) => {
     fullPage: false,
     animations: "disabled",
   });
-  await p.getByRole("link", { name: "Orders Queue", exact: true }).click();
+  await p
+    .getByRole("navigation", { name: "Dispatcher navigation" })
+    .getByRole("link", { name: "Orders", exact: true })
+    .click();
   await p.getByLabel("Search orders").fill(deferred.id);
   await p.getByRole("button", { name: "Defer", exact: true }).click();
   const modal = p.getByRole("dialog", { name: "Defer Outlet", exact: true });
@@ -221,7 +231,10 @@ module.exports = async ({ db, base, url, pages, day }) => {
     .getByRole("button", { name: "Confirm deferral", exact: true })
     .click();
   await expect(modal).toHaveCount(0);
-  await p.getByRole("link", { name: "Deferred Orders", exact: true }).click();
+  await p
+    .getByRole("navigation", { name: "Dispatcher navigation" })
+    .getByRole("link", { name: "Deferrals", exact: true })
+    .click();
   await p.getByLabel("Search orders").fill(deferred.id);
   await expect(p.getByRole("table", { name: "Deferred orders" })).toContainText(
     "Outlet requested the next operating run",
@@ -231,11 +244,15 @@ module.exports = async ({ db, base, url, pages, day }) => {
     `${date} → ${next[0]}`,
   );
   await p.keyboard.press("Escape");
-  await p.getByRole("link", { name: "Dashboard", exact: true }).click();
+  await p
+    .getByRole("navigation", { name: "Dispatcher navigation" })
+    .getByRole("link", { name: "Overview", exact: true })
+    .click();
   await expect(
-    p.getByRole("heading", { name: "Dispatcher Dashboard" }),
+    p.getByRole("heading", { name: "Dispatcher Overview" }),
   ).toBeVisible();
   await p.setViewportSize({ width: 390, height: 844 });
+  await p.getByRole("button", { name: "Open menu", exact: true }).click();
   await expect(
     p.getByRole("navigation", { name: "Dispatcher navigation" }),
   ).toBeVisible();
@@ -251,6 +268,7 @@ module.exports = async ({ db, base, url, pages, day }) => {
     fullPage: false,
     animations: "disabled",
   });
+  await p.getByRole("button", { name: "Close menu", exact: true }).click();
   await p.setViewportSize({ width: 1280, height: 900 });
   // Empty and failed reads are visibly different, with no mock rows substituted.
   await p.route("**/api/dispatcher/orders?**", (route) =>
@@ -264,7 +282,10 @@ module.exports = async ({ db, base, url, pages, day }) => {
       }),
     }),
   );
-  await p.getByRole("link", { name: "Orders Queue", exact: true }).click();
+  await p
+    .getByRole("navigation", { name: "Dispatcher navigation" })
+    .getByRole("link", { name: "Orders", exact: true })
+    .click();
   await expect(p.getByRole("alert")).toContainText("Test service unavailable");
   await p.unroute("**/api/dispatcher/orders?**");
   await p.getByRole("button", { name: "Retry", exact: true }).click();
@@ -274,7 +295,7 @@ module.exports = async ({ db, base, url, pages, day }) => {
   // Role navigation cannot mount the Dispatcher tree for the Store account.
   await pages.store.goto(`${url}/dispatcher/planning`);
   await expect(
-    pages.store.getByRole("heading", { name: "Orders & receipts" }),
+    pages.store.getByRole("heading", { name: "My Orders" }),
   ).toBeVisible();
   console.log(
     "PASS: Dispatcher seven-screen routing, actual filters/detail/modal focus, add/remove/reorder, six backend validation reasons, retained draft across reload, lost allocation response recovery, explicit publication, eligible-date deferral/history, Driver monitoring, mobile layout and real error/empty states.",

@@ -68,6 +68,7 @@ export function mapOrder(order: ApiOrder, deliveries: DeliveryView[] = [], recei
     deliveryId: delivery?.id, deliveryVersion: delivery?.version, receiptConfirmed: Boolean(receipt),
     pod: proof ? { receivedBy: proof.recipientName, location: '', photoRef: proof.photoRefs[0], signatureRef: proof.signatureRef } : undefined,
     recoveryPending: order.recoveryPending,
+    deliveredDate: delivery ? todayColombo(new Date(delivery.capturedAt)) : undefined,
     deliveredAt: delivery ? time(delivery.capturedAt) : undefined,
     events: { ...(order.createdAt ? { placed: time(order.createdAt), confirmed: time(order.createdAt) } : {}), ...(delivery ? { delivered: time(delivery.capturedAt) } : {}), ...(receipt ? { receipt_confirmed: time(receipt.confirmedAt) } : {}) },
     deferral: order.status === 'DEFERRED' && order.deferredToDate ? { originalDate: order.requestedDate, newDate: order.deferredToDate, reason: order.deferReason ?? 'Deferred', detail: order.deferReason ?? '', decidedAt: 'Recorded by dispatch' } : undefined,
