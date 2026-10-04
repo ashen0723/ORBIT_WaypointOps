@@ -148,11 +148,12 @@ model User {
   depot   Depot?   @relation(fields: [depotId], references: [id])
   vehicle Vehicle? @relation(fields: [vehicleId], references: [id])
 
-  ordersCreated   Order[]         @relation("OrderCreatedBy")
-  loadingRecords  LoadingRecord[]
-  receipts        Receipt[]
-  auditEvents     AuditEvent[]
-  syncActions     SyncAction[]
+  ordersCreated  Order[]         @relation("OrderCreatedBy")
+  loadingRecords LoadingRecord[]
+  receipts       Receipt[]
+  auditEvents    AuditEvent[]
+  syncActions    SyncAction[]
+  tripsDriven    Trip[]          @relation("TripDriver")
 }
 
 model Outlet {
@@ -241,8 +242,8 @@ model OrderLine {
   order         Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
   loadingIssues LoadingIssue[]
   receiptIssues ReceiptIssue[]
-  deliveryLines DeliveryLine[]
-  receiptLines ReceiptLine[]
+  attemptLines  TripStopLine[]
+  receiptLines  ReceiptLine[]
 }
 
 // ─── Planning and trips ─────────────────────────────────────────────────────
@@ -250,6 +251,7 @@ model OrderLine {
 model Trip {
   id               String     @id @default(cuid())
   vehicleId        String
+  driverId         String? // assigned User snapshot; nullable for legacy/unassigned drafts
   depotId          String
   date             DateTime   @db.Date
   tripNo           Int // 1 or 2
@@ -262,6 +264,7 @@ model Trip {
   updatedAt        DateTime   @updatedAt
 
   vehicle       Vehicle        @relation(fields: [vehicleId], references: [id])
+  driver        User?          @relation("TripDriver", fields: [driverId], references: [id], onDelete: Restrict)
   depot         Depot          @relation(fields: [depotId], references: [id])
   stops         TripStop[]
   loadingRecord LoadingRecord?
@@ -272,7 +275,8 @@ model Trip {
 model TripStop {
   id        String     @id @default(cuid())
   tripId    String
-  orderId   String // retries preserve previous stops
+  orderId   String
+  isActive  Boolean    @default(true) // partial unique index in workflow_contract_v1
   sequence  Int
   etaTime   String? // "HH:MM"
   status    StopStatus @default(PLANNED)
@@ -280,9 +284,10 @@ model TripStop {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
-  trip     Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  order    Order     @relation(fields: [orderId], references: [id])
+  trip     Trip           @relation(fields: [tripId], references: [id], onDelete: Restrict)
+  order    Order          @relation(fields: [orderId], references: [id])
   delivery Delivery?
+  lines    TripStopLine[]
 
   @@unique([tripId, sequence])
   @@index([orderId])
@@ -300,7 +305,7 @@ model LoadingRecord {
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
 
-  trip      Trip           @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  trip      Trip           @relation(fields: [tripId], references: [id], onDelete: Restrict)
   checkedBy User           @relation(fields: [checkedById], references: [id])
   issues    LoadingIssue[]
 }
@@ -339,20 +344,6 @@ model Delivery {
   stop    TripStop         @relation(fields: [stopId], references: [id])
   pod     ProofOfDelivery?
   receipt Receipt?
-  lines   DeliveryLine[]
-}
-
-model DeliveryLine {
-  id           String @id @default(cuid())
-  deliveryId   String
-  orderLineId  String
-  loadedQty    Int
-  deliveredQty Int
-  returnedQty  Int
-  delivery     Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
-  orderLine    OrderLine @relation(fields: [orderLineId], references: [id])
-
-  @@unique([deliveryId, orderLineId])
 }
 
 model ProofOfDelivery {
@@ -365,7 +356,7 @@ model ProofOfDelivery {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  delivery Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  delivery Delivery @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
 }
 
 model Receipt {
@@ -383,21 +374,6 @@ model Receipt {
   confirmedBy User           @relation(fields: [confirmedById], references: [id])
   issues      ReceiptIssue[]
   lines       ReceiptLine[]
-}
-
-model ReceiptLine {
-  id           String  @id @default(cuid())
-  receiptId    String
-  orderLineId  String
-  acceptedQty  Int
-  damagedQty   Int
-  missingQty   Int
-  note         String?
-  photoRefs    String[]
-  receipt      Receipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
-  orderLine    OrderLine @relation(fields: [orderLineId], references: [id])
-
-  @@unique([receiptId, orderLineId])
 }
 
 model ReceiptIssue {
@@ -445,4 +421,43 @@ model SyncAction {
   syncedAt       DateTime?
 
   user User @relation(fields: [userId], references: [id])
+}
+
+// Authoritative quantities for one allocation/delivery attempt. OrderLine.requestedQty is original demand.
+model TripStopLine {
+  id           String @id @default(cuid())
+  tripStopId   String
+  orderLineId  String
+  plannedQty   Int
+  cancelledQty Int    @default(0)
+  loadedQty    Int? // null until recorded
+  deliveredQty Int? // null until recorded
+  returnedQty  Int    @default(0)
+
+  tripStop  TripStop  @relation(fields: [tripStopId], references: [id], onDelete: Restrict)
+  orderLine OrderLine @relation(fields: [orderLineId], references: [id], onDelete: Restrict)
+
+  @@unique([tripStopId, orderLineId])
+}
+
+model ReceiptLine {
+  id          String @id @default(cuid())
+  receiptId   String
+  orderLineId String
+  acceptedQty Int
+  damagedQty  Int
+  missingQty  Int
+  note        String?
+  photoRefs   String[] @default([])
+
+  receipt   Receipt   @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  orderLine OrderLine @relation(fields: [orderLineId], references: [id], onDelete: Restrict)
+
+  @@unique([receiptId, orderLineId])
+}
+
+// Global calendar: date is the key, independent of depot.
+model OperatingDay {
+  date      DateTime @id @db.Date
+  operating Boolean
 }

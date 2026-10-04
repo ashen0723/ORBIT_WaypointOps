@@ -8,7 +8,7 @@ import { StoreUser } from './store-auth.guard';
 
 const orderDetails = {
   outlet: true,
-  lines: true,
+  lines: { include: { attemptLines: true } },
   stops: { include: { trip: { include: { vehicle: true } }, delivery: { include: { lines: true, pod: true, receipt: { include: { lines: true } } } } }, orderBy: { createdAt: 'asc' } },
 } as const;
 
@@ -71,7 +71,11 @@ export class OrdersService {
       id: order.id, version: order.version, outletId: order.outletId, brand: order.outlet.brand, temp: order.temp,
       requestedDate: dateOnly(order.requestedDate), plannedDate: dateOnly(order.plannedDate), status: order.status,
       units: order.units, weightKg: order.weightKg, volumeM3: order.volumeM3,
-      lines: order.lines.map(line => ({ id: line.id, item: line.item, unit: line.unit, requestedQty: line.requestedQty, cancelledQty: line.cancelledQty, deliveredQty: line.deliveredQty })),
+      lines: order.lines.map(line => ({
+        id: line.id, item: line.item, unit: line.unit, requestedQty: line.requestedQty,
+        cancelledQty: line.attemptLines.reduce((sum, attempt) => sum + attempt.cancelledQty, 0),
+        deliveredQty: line.attemptLines.reduce((sum, attempt) => sum + (attempt.deliveredQty ?? 0), 0),
+      })),
       activeTripId: order.activeTripId, attemptStopIds: order.stops.map(stop => stop.id), recoveryPending: order.recoveryPending,
       deferralCount: order.deferralCount, deferReason: order.deferReason, deferredToDate: dateOnly(order.deferredToDate),
       attempts: order.stops, createdAt: order.createdAt, updatedAt: order.updatedAt,

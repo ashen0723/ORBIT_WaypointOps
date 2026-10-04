@@ -161,3 +161,12 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Private dataset imports (synthetic/project CSV fixtures remain visible)
+.private-datasets/
+private-data/
+import-mapping.local.json
+outlets.csv
+vehicles.csv
+calendar.csv
+import-report.local.*

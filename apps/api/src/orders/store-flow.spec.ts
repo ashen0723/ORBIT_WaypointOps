@@ -27,7 +27,7 @@ describe('Store order contract', () => {
 describe('Store receipt contract', () => {
   const user = { id: 'user-1', outletId: 'OUT-001' };
   const receiptInput = { clientActionId: 'receipt-123456', expectedDeliveryVersion: 1, lines: [{ orderLineId: 'line-1', acceptedQty: 14, damagedQty: 0, missingQty: 0, note: null, photoRefs: [] }] };
-  const delivery = { id: 'delivery-1', version: 1, outcome: 'PARTIAL', lines: [{ orderLineId: 'line-1', deliveredQty: 14 }], stop: { order: { id: 'order-1', outletId: 'OUT-001', status: 'DELIVERED', recoveryPending: true, lines: [{ requestedQty: 20, cancelledQty: 4, deliveredQty: 14 }] } }, receipt: null };
+  const delivery = { id: 'delivery-1', version: 1, outcome: 'PARTIAL', stop: { lines: [{ orderLineId: 'line-1', deliveredQty: 14 }], order: { id: 'order-1', outletId: 'OUT-001', status: 'DELIVERED', recoveryPending: true, lines: [{ requestedQty: 20, attemptLines: [{ cancelledQty: 4, deliveredQty: 14 }] }] } }, receipt: null };
 
   it('rejects a version mismatch before saving a receipt', async () => {
     const prisma = { receipt: { findUnique: jest.fn().mockResolvedValue(null) }, delivery: { findUnique: jest.fn().mockResolvedValue(delivery) }, $transaction: async (callback: (tx: unknown) => Promise<unknown>) => callback(prisma) };

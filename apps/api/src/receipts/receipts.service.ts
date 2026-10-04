@@ -59,18 +59,18 @@ export class ReceiptsService {
     }
     try {
       return await this.prisma.$transaction(async tx => {
-        const delivery = await tx.delivery.findUnique({ where: { id: deliveryId }, include: { lines: true, stop: { include: { order: { include: { lines: true } } } }, receipt: true } });
+        const delivery = await tx.delivery.findUnique({ where: { id: deliveryId }, include: { stop: { include: { lines: true, order: { include: { lines: { include: { attemptLines: true } } } } } }, receipt: true } });
         if (!delivery) throw new NotFoundException({ code: 'DELIVERY_NOT_FOUND', message: 'Delivery not found.', details: [] });
         const order = delivery.stop.order;
         if (order.outletId !== user.outletId) throw new ForbiddenException({ code: 'WRONG_OUTLET', message: 'You cannot access another outlet’s delivery.', details: [] });
         if (delivery.receipt?.confirmedAt) throw new ConflictException({ code: 'RECEIPT_CONFIRMED', message: 'This delivery already has a receipt.', details: [] });
         if (delivery.version !== input.expectedDeliveryVersion) throw new ConflictException({ code: 'DELIVERY_VERSION_CHANGED', message: 'Delivery changed; refresh and retry.', details: [] });
-        if ((delivery.outcome !== StopStatus.DELIVERED && delivery.outcome !== StopStatus.PARTIAL) || delivery.lines.length === 0) throw new ConflictException({ code: 'NOT_DELIVERED', message: 'A completed handover is required.', details: [] });
-        const driverLines = new Map(delivery.lines.map(line => [line.orderLineId, line]));
+        if ((delivery.outcome !== StopStatus.DELIVERED && delivery.outcome !== StopStatus.PARTIAL) || delivery.stop.lines.length === 0) throw new ConflictException({ code: 'NOT_DELIVERED', message: 'A completed handover is required.', details: [] });
+        const driverLines = new Map(delivery.stop.lines.map(line => [line.orderLineId, line]));
         if (driverLines.size !== input.lines.length) invalid('Receipt must include every delivered line exactly once.');
         for (const line of input.lines) {
           const driverLine = driverLines.get(line.orderLineId);
-          if (!driverLine || line.acceptedQty + line.damagedQty + line.missingQty !== driverLine.deliveredQty) invalid('Receipt quantities must equal the Driver’s recorded handover for each line.');
+          if (!driverLine || driverLine.deliveredQty === null || line.acceptedQty + line.damagedQty + line.missingQty !== driverLine.deliveredQty) invalid('Receipt quantities must equal the Driver’s recorded handover for each line.');
         }
         const hasIssue = input.lines.some(line => line.damagedQty > 0 || line.missingQty > 0);
         const receipt = await tx.receipt.create({
@@ -79,7 +79,11 @@ export class ReceiptsService {
         });
         const allStops = await tx.tripStop.findMany({ where: { orderId: order.id }, include: { delivery: { include: { receipt: true } } } });
         const allHandoversReceipted = allStops.every(stop => !stop.delivery || (stop.delivery.outcome !== StopStatus.DELIVERED && stop.delivery.outcome !== StopStatus.PARTIAL) || Boolean(stop.delivery.receipt?.confirmedAt));
-        const outstanding = order.lines.reduce((sum, line) => sum + line.requestedQty - line.cancelledQty - line.deliveredQty, 0);
+        const outstanding = order.lines.reduce((sum, line) => {
+          const cancelled = line.attemptLines.reduce((qty, attempt) => qty + attempt.cancelledQty, 0);
+          const delivered = line.attemptLines.reduce((qty, attempt) => qty + (attempt.deliveredQty ?? 0), 0);
+          return sum + line.requestedQty - cancelled - delivered;
+        }, 0);
         if (!hasIssue && !order.recoveryPending && outstanding <= 0 && allHandoversReceipted && order.status === OrderStatus.DELIVERED) {
           await tx.order.update({ where: { id: order.id }, data: { status: OrderStatus.RECEIVED, version: { increment: 1 } } });
         }
