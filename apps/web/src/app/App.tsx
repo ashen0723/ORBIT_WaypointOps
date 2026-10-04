@@ -6,8 +6,9 @@ import { Login } from '../features/dispatcher/pages/Login';
 import { DispatcherApp } from '../features/dispatcher/live/DispatcherApp';
 import { App as LoaderApp } from '../features/loader/App';
 import { OperationsApp } from '../features/operations/OperationsApp';
+import { LiveDriverApp } from '../features/driver/LiveDriverApp';
 
-const ROLE_MODULES: RoleModules = { dispatcher: DispatcherApp, store_manager: OperationsApp, loader: LoaderApp, driver: OperationsApp };
+const ROLE_MODULES: RoleModules = { dispatcher: DispatcherApp, store_manager: OperationsApp, loader: LoaderApp, driver: LiveDriverApp };
 
 const LOGIN_TREE = (
   <BrowserRouter>
