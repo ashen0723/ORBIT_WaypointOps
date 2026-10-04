@@ -137,4 +137,87 @@ describe('LoadingService', () => {
       status: 404,
     });
   });
+
+  it('starts a published trip and its planned orders in one transaction', async () => {
+    const findFirst = jest.fn().mockResolvedValue({
+      id: 'TRIP-1',
+      status: 'CONFIRMED',
+      loadingRecord: null,
+      stops: [{ orderId: 'ORD-1' }, { orderId: 'ORD-2' }],
+    });
+    const createRecord = jest.fn().mockResolvedValue({
+      id: 'LOAD-1', status: 'IN_PROGRESS', checkedById: 'USR-LDR',
+      startedAt: new Date('2026-10-05T04:30:00.000Z'),
+    });
+    const updateTrip = jest.fn().mockResolvedValue({});
+    const updateOrders = jest.fn().mockResolvedValue({ count: 2 });
+    const createAudit = jest.fn().mockResolvedValue({});
+    const transaction = jest.fn(async (callback) => callback({
+      loadingRecord: { create: createRecord },
+      trip: { update: updateTrip },
+      order: { updateMany: updateOrders },
+      auditEvent: { create: createAudit },
+    }));
+    const startService = new LoadingService({
+      trip: { findFirst },
+      $transaction: transaction,
+    } as unknown as PrismaService);
+
+    await expect(startService.startLoading('TRIP-1', {
+      id: 'USR-LDR', depotId: 'DEP-PLG',
+    })).resolves.toMatchObject({
+      loadingRecordId: 'LOAD-1', tripStatus: 'LOADING', loadingStatus: 'IN_PROGRESS',
+      alreadyStarted: false,
+    });
+
+    expect(createRecord).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tripId: 'TRIP-1', checkedById: 'USR-LDR', status: 'IN_PROGRESS',
+      }),
+    });
+    expect(updateTrip).toHaveBeenCalledWith({
+      where: { id: 'TRIP-1' }, data: { status: 'LOADING' },
+    });
+    expect(updateOrders).toHaveBeenCalledWith({
+      where: { id: { in: ['ORD-1', 'ORD-2'] }, status: 'PLANNED' },
+      data: { status: 'LOADING' },
+    });
+    expect(createAudit).toHaveBeenCalledWith({
+      data: expect.objectContaining({ action: 'LOADING_STARTED', entityId: 'TRIP-1' }),
+    });
+  });
+
+  it('returns an existing loading record without creating a duplicate', async () => {
+    const findFirst = jest.fn().mockResolvedValue({
+      id: 'TRIP-1', status: 'LOADING', stops: [],
+      loadingRecord: {
+        id: 'LOAD-1', status: 'IN_PROGRESS', checkedById: 'USR-LDR',
+        startedAt: new Date('2026-10-05T04:30:00.000Z'),
+      },
+    });
+    const transaction = jest.fn();
+    const startService = new LoadingService({
+      trip: { findFirst }, $transaction: transaction,
+    } as unknown as PrismaService);
+
+    await expect(startService.startLoading('TRIP-1', {
+      id: 'USR-LDR', depotId: 'DEP-PLG',
+    })).resolves.toMatchObject({
+      loadingRecordId: 'LOAD-1', alreadyStarted: true,
+    });
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects starting a trip that is not in a loadable state', async () => {
+    const findFirst = jest.fn().mockResolvedValue({
+      id: 'TRIP-1', status: 'READY', loadingRecord: null, stops: [],
+    });
+    const startService = new LoadingService({
+      trip: { findFirst },
+    } as unknown as PrismaService);
+
+    await expect(startService.startLoading('TRIP-1', {
+      id: 'USR-LDR', depotId: 'DEP-PLG',
+    })).rejects.toMatchObject({ status: 409 });
+  });
 });

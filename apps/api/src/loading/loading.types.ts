@@ -99,3 +99,13 @@ export interface LoaderTripDetail {
     updatedAt: string;
   }>;
 }
+
+export interface LoadingStartResult {
+  loadingRecordId: string;
+  tripId: string;
+  tripStatus: string;
+  loadingStatus: string;
+  checkedById: string;
+  startedAt: string | null;
+  alreadyStarted: boolean;
+}

@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
   LoaderQueueStatus,
+  LoadingStartResult,
   LoaderTripDetail,
   LoaderTripSummary,
 } from './loading.types';
@@ -179,6 +180,99 @@ export class LoadingService {
         updatedAt: issue.updatedAt.toISOString(),
       })),
     };
+  }
+
+  async startLoading(
+    tripId: string,
+    loader: { id: string; depotId: string },
+  ): Promise<LoadingStartResult> {
+    const trip = await this.prisma.trip.findFirst({
+      where: { id: tripId, depotId: loader.depotId },
+      select: {
+        id: true,
+        status: true,
+        loadingRecord: {
+          select: {
+            id: true,
+            status: true,
+            checkedById: true,
+            startedAt: true,
+          },
+        },
+        stops: {
+          select: { orderId: true },
+        },
+      },
+    });
+
+    if (!trip) {
+      throw new NotFoundException('Trip not found for this Loader depot.');
+    }
+
+    if (!['CONFIRMED', 'LOADING'].includes(trip.status)) {
+      throw new ConflictException('Only a published trip awaiting or currently in loading can be started.');
+    }
+
+    if (trip.loadingRecord) {
+      return {
+        loadingRecordId: trip.loadingRecord.id,
+        tripId,
+        tripStatus: trip.status,
+        loadingStatus: trip.loadingRecord.status,
+        checkedById: trip.loadingRecord.checkedById,
+        startedAt: trip.loadingRecord.startedAt?.toISOString() ?? null,
+        alreadyStarted: true,
+      };
+    }
+
+    const startedAt = new Date();
+    const orderIds = trip.stops.map((stop) => stop.orderId);
+
+    return this.prisma.$transaction(async (transaction) => {
+      const loadingRecord = await transaction.loadingRecord.create({
+        data: {
+          tripId,
+          checkedById: loader.id,
+          status: 'IN_PROGRESS',
+          startedAt,
+        },
+      });
+
+      await transaction.trip.update({
+        where: { id: tripId },
+        data: { status: 'LOADING' },
+      });
+
+      if (orderIds.length > 0) {
+        await transaction.order.updateMany({
+          where: {
+            id: { in: orderIds },
+            status: 'PLANNED',
+          },
+          data: { status: 'LOADING' },
+        });
+      }
+
+      await transaction.auditEvent.create({
+        data: {
+          actorId: loader.id,
+          entityType: 'Trip',
+          entityId: tripId,
+          action: 'LOADING_STARTED',
+          payload: { loadingRecordId: loadingRecord.id },
+        },
+      });
+
+      return {
+        loadingRecordId: loadingRecord.id,
+        tripId,
+        tripStatus: 'LOADING',
+        loadingStatus: loadingRecord.status,
+        checkedById: loadingRecord.checkedById,
+        startedAt: loadingRecord.startedAt?.toISOString() ?? null,
+        alreadyStarted: false,
+      };
+    });
   }
 }
 
