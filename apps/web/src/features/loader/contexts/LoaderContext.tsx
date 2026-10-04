@@ -17,7 +17,12 @@ import type {
   LoaderIssueType,
 } from '../types/loader';
 import { useAuth } from '../../../app/providers/AuthProvider';
-import { fetchLoaderTrip, fetchLoaderTrips } from '../api/loaderApi';
+import {
+  fetchLoaderTrip,
+  fetchLoaderTrips,
+  startLoadingTrip as startLoadingTripRequest,
+  updateLoadedQuantity,
+} from '../api/loaderApi';
 
 export interface LoaderTripView {
   tripId: string;
@@ -40,12 +45,17 @@ interface LoaderContextValue {
   tripLoadingId: string | null;
   tripErrors: Record<string, string>;
   loadTrip: (tripId: string) => Promise<void>;
+  startLoadingTrip: (tripId: string) => Promise<void>;
+  startingTripId: string | null;
+  operationErrors: Record<string, string>;
 
   tripDataById: Record<string, LoaderTripView>;
 
   quantities: Record<string, number>;
   confirmedItemIds: string[];
   issues: Record<string, LoaderIssue>;
+  savingLineIds: string[];
+  lineErrors: Record<string, string>;
 
   /**
    * Temporary compatibility state for pages that have not yet been
@@ -64,12 +74,12 @@ interface LoaderContextValue {
   setLoadedQuantity: (
     itemId: string,
     value: number,
-  ) => void;
+  ) => Promise<void>;
 
   markItemLoaded: (
     itemId: string,
     expected: number,
-  ) => void;
+  ) => Promise<void>;
 
   reportIssue: (
     target: LoaderIssueTarget,
@@ -130,6 +140,8 @@ export function LoaderProvider({
   const [queueError, setQueueError] = useState<string | null>(null);
   const [tripLoadingId, setTripLoadingId] = useState<string | null>(null);
   const [tripErrors, setTripErrors] = useState<Record<string, string>>({});
+  const [startingTripId, setStartingTripId] = useState<string | null>(null);
+  const [operationErrors, setOperationErrors] = useState<Record<string, string>>({});
 
   const [
     tripDataById,
@@ -149,6 +161,9 @@ export function LoaderProvider({
     confirmedItemIds,
     setConfirmedItemIds,
   ] = useState<string[]>([]);
+
+  const [savingLineIds, setSavingLineIds] = useState<string[]>([]);
+  const [lineErrors, setLineErrors] = useState<Record<string, string>>({});
 
   const [
     issues,
@@ -224,6 +239,74 @@ export function LoaderProvider({
     }
   }, [queueLoads, token]);
 
+  const startLoadingTrip = useCallback(async (tripId: string) => {
+    if (!token) {
+      setOperationErrors((current) => ({ ...current, [tripId]: 'Sign in to start loading.' }));
+      return;
+    }
+
+    setStartingTripId(tripId);
+    setOperationErrors((current) => {
+      const next = { ...current };
+      delete next[tripId];
+      return next;
+    });
+
+    try {
+      await startLoadingTripRequest(token, tripId);
+      setQueueLoads((current) => current.map((load) =>
+        load.tripId === tripId ? { ...load, status: 'loading' } : load,
+      ));
+      setTripDataById((current) => {
+        const trip = current[tripId];
+        return trip
+          ? { ...current, [tripId]: { ...trip, queueItem: { ...trip.queueItem, status: 'loading' } } }
+          : current;
+      });
+    } catch (error) {
+      setOperationErrors((current) => ({
+        ...current,
+        [tripId]: error instanceof Error ? error.message : 'Could not start loading.',
+      }));
+    } finally {
+      setStartingTripId((current) => current === tripId ? null : current);
+    }
+  }, [token]);
+
+  const persistLoadedQuantity = useCallback(async (itemId: string, nextValue: number) => {
+    if (!token) {
+      setLineErrors((current) => ({ ...current, [itemId]: 'Sign in to save this quantity.' }));
+      return;
+    }
+
+    const safeValue = Math.max(0, Math.trunc(nextValue));
+    const previousValue = quantities[itemId] ?? 0;
+    setQuantities((current) => ({ ...current, [itemId]: safeValue }));
+    setConfirmedItemIds((current) => current.filter((id) => id !== itemId));
+    setSavingLineIds((current) => current.includes(itemId) ? current : [...current, itemId]);
+    setLineErrors((current) => {
+      const next = { ...current };
+      delete next[itemId];
+      return next;
+    });
+
+    try {
+      const result = await updateLoadedQuantity(token, itemId, safeValue);
+      setQuantities((current) => ({ ...current, [itemId]: result.loadedQty }));
+      setConfirmedItemIds((current) => result.complete
+        ? current.includes(itemId) ? current : [...current, itemId]
+        : current.filter((id) => id !== itemId));
+    } catch (error) {
+      setQuantities((current) => ({ ...current, [itemId]: previousValue }));
+      setLineErrors((current) => ({
+        ...current,
+        [itemId]: error instanceof Error ? error.message : 'Could not save this quantity.',
+      }));
+    } finally {
+      setSavingLineIds((current) => current.filter((id) => id !== itemId));
+    }
+  }, [quantities, token]);
+
   const value =
     useMemo<LoaderContextValue>(
       () => ({
@@ -234,10 +317,15 @@ export function LoaderProvider({
         tripLoadingId,
         tripErrors,
         loadTrip,
+        startLoadingTrip,
+        startingTripId,
+        operationErrors,
         tripDataById,
         quantities,
         confirmedItemIds,
         issues,
+        savingLineIds,
+        lineErrors,
         reviewedPlanVehicleIds,
         handedOffVehicleIds,
 
@@ -291,9 +379,14 @@ export function LoaderProvider({
 
         clearLoaderData: () => {
           setQueueLoads([]);
+          setQueueError(null);
           setTripDataById({});
+          setTripErrors({});
+          setOperationErrors({});
           setQuantities({});
           setConfirmedItemIds([]);
+          setSavingLineIds([]);
+          setLineErrors({});
           setIssues({});
           setReviewedPlanVehicleIds(
             [],
@@ -301,56 +394,9 @@ export function LoaderProvider({
           setHandedOffVehicleIds([]);
         },
 
-        setLoadedQuantity: (
-          itemId,
-          nextValue,
-        ) => {
-          const safeValue =
-            Math.max(
-              0,
-              Math.trunc(nextValue),
-            );
+        setLoadedQuantity: persistLoadedQuantity,
 
-          setQuantities(
-            (current) => ({
-              ...current,
-              [itemId]: safeValue,
-            }),
-          );
-
-          setConfirmedItemIds(
-            (current) =>
-              current.filter(
-                (id) =>
-                  id !== itemId,
-              ),
-          );
-        },
-
-        markItemLoaded: (
-          itemId,
-          expected,
-        ) => {
-          setQuantities(
-            (current) => ({
-              ...current,
-              [itemId]:
-                expected,
-            }),
-          );
-
-          setConfirmedItemIds(
-            (current) =>
-              current.includes(
-                itemId,
-              )
-                ? current
-                : [
-                  ...current,
-                  itemId,
-                ],
-          );
-        },
+        markItemLoaded: persistLoadedQuantity,
 
         reportIssue: (
           target,
@@ -666,7 +712,13 @@ export function LoaderProvider({
         tripLoadingId,
         tripErrors,
         loadTrip,
+        startLoadingTrip,
+        startingTripId,
+        operationErrors,
         reviewedPlanVehicleIds,
+        savingLineIds,
+        lineErrors,
+        persistLoadedQuantity,
         tripDataById,
       ],
     );

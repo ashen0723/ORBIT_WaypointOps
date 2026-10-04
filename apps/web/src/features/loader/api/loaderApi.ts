@@ -102,6 +102,24 @@ export interface MappedLoaderTripDetail {
   issues: Record<string, LoaderIssue>;
 }
 
+export interface LoadingStartDto {
+  loadingRecordId: string;
+  tripId: string;
+  tripStatus: string;
+  loadingStatus: string;
+  checkedById: string;
+  startedAt: string | null;
+  alreadyStarted: boolean;
+}
+
+export interface LoadedQuantityDto {
+  orderLineId: string;
+  tripId: string;
+  expectedQty: number;
+  loadedQty: number;
+  complete: boolean;
+}
+
 export async function fetchLoaderTrips(
   token: string,
   signal?: AbortSignal,
@@ -125,6 +143,28 @@ export async function fetchLoaderTrip(
   );
 
   return mapLoaderTripDetail(detail, queueItem);
+}
+
+export function startLoadingTrip(token: string, tripId: string): Promise<LoadingStartDto> {
+  return apiFetch<LoadingStartDto>(`/loading/${encodeURIComponent(tripId)}/start`, {
+    method: 'POST',
+    token,
+  });
+}
+
+export function updateLoadedQuantity(
+  token: string,
+  orderLineId: string,
+  loadedQty: number,
+): Promise<LoadedQuantityDto> {
+  return apiFetch<LoadedQuantityDto>(
+    `/loading/lines/${encodeURIComponent(orderLineId)}`,
+    {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify({ loadedQty }),
+    },
+  );
 }
 
 export function mapLoaderTripSummary(trip: LoaderTripSummaryDto): LoadQueueItem {

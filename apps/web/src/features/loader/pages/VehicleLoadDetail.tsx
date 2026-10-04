@@ -47,6 +47,11 @@ export function VehicleLoadDetail() {
     tripLoadingId,
     tripErrors,
     loadTrip,
+    startLoadingTrip,
+    startingTripId,
+    operationErrors,
+    savingLineIds,
+    lineErrors,
   } = useLoader();
 
   const tripId =
@@ -135,6 +140,14 @@ export function VehicleLoadDetail() {
     stops,
   } = tripData;
 
+  const requiresStart = load.status === 'ready' || load.status === 'ready_to_load';
+  const canEditQuantities = [
+    'loading',
+    'in_progress',
+    'awaiting_dispatcher',
+  ].includes(load.status);
+  const startError = operationErrors[tripId];
+
   const ordersWithCurrentQuantities =
     orders.map(
           (order) => ({
@@ -213,6 +226,28 @@ export function VehicleLoadDetail() {
           }
         />
       </div>
+
+      {requiresStart && (
+        <Card className="mt-5 border-brand/20 bg-brand-pale p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-semibold text-forest">Start this loading record</p>
+              <p className="mt-1 text-sm text-forest/75">
+                Start loading before recording actual item quantities.
+              </p>
+              {startError && <p className="mt-2 text-sm font-semibold text-red-700">{startError}</p>}
+            </div>
+            <button
+              type="button"
+              onClick={() => void startLoadingTrip(tripId)}
+              disabled={startingTripId === tripId}
+              className={buttonStyles('primary', 'lg')}
+            >
+              {startingTripId === tripId ? 'Starting…' : 'Start Loading'}
+            </button>
+          </div>
+        </Card>
+      )}
 
       <section className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <Card className="p-5 md:p-7">
@@ -593,12 +628,19 @@ export function VehicleLoadDetail() {
                                 onChange={(
                                   value,
                                 ) =>
-                                  setLoadedQuantity(
+                                  void setLoadedQuantity(
                                     item.id,
                                     value,
                                   )
                                 }
+                                disabled={!canEditQuantities || savingLineIds.includes(item.id)}
                               />
+
+                              {lineErrors[item.id] && (
+                                <p className="w-full text-sm font-semibold text-red-700">
+                                  {lineErrors[item.id]}
+                                </p>
+                              )}
 
                               {short ? (
                                 itemIssue ? (
@@ -640,11 +682,12 @@ export function VehicleLoadDetail() {
                                 <button
                                   type="button"
                                   onClick={() =>
-                                    markItemLoaded(
+                                    void markItemLoaded(
                                       item.id,
                                       item.expected,
                                     )
                                   }
+                                  disabled={!canEditQuantities || savingLineIds.includes(item.id)}
                                   className={buttonStyles(
                                     'secondary',
                                     'md',
