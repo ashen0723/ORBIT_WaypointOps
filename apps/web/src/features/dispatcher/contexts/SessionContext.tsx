@@ -1,6 +1,13 @@
-import React, { createContext, ReactNode, useCallback, useContext, useMemo, useState } from 'react';
-import type { PublicUser } from '../types/dispatch';
-import { OfflineError, transport } from '../utils/network';
+import {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+} from "react";
+import type { SessionUser as PublicUser } from "@waypoint/contracts";
+import { apiFetch } from "../../../api/client";
 
 interface SessionValue {
   user: PublicUser | null;
@@ -12,7 +19,7 @@ interface SessionValue {
 
 const SessionContext = createContext<SessionValue | null>(null);
 /** Per-tab, so two tabs can be signed in as two different roles at once. */
-const KEY = 'waypoint.session';
+const KEY = "waypoint.live.session";
 
 interface Stored {
   token: string;
@@ -22,24 +29,26 @@ interface Stored {
 function readStored(): Stored | null {
   try {
     const raw = sessionStorage.getItem(KEY);
-    return raw ? JSON.parse(raw) as Stored : null;
+    return raw ? (JSON.parse(raw) as Stored) : null;
   } catch {
     return null;
   }
 }
 
-export function SessionProvider({ children }: {children: ReactNode;}) {
+export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Stored | null>(readStored);
 
   const login = useCallback(async (email: string, password: string) => {
     try {
-      const res = await transport<Stored>({ op: 'login', email, password }, null);
-      if (!res.ok) return res.message;
-      sessionStorage.setItem(KEY, JSON.stringify(res.data));
-      setSession(res.data);
+      const res = await apiFetch<Stored>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+      sessionStorage.setItem(KEY, JSON.stringify(res));
+      setSession(res);
       return null;
     } catch (e) {
-      return e instanceof OfflineError ? 'You’re offline. Signing in needs a connection.' : 'Couldn’t reach the server.';
+      return e instanceof Error ? e.message : "Couldn’t reach the server.";
     }
   }, []);
 
@@ -49,21 +58,26 @@ export function SessionProvider({ children }: {children: ReactNode;}) {
   }, []);
 
   const logout = useCallback(async () => {
-    const token = session?.token ?? null;
     expire();
-    try {
-      await transport({ op: 'logout' }, token);
-    } catch {
+  }, [expire]);
 
-      // Offline sign-out still clears the local session.
-    }}, [session, expire]);
-
-  const value = useMemo(() => ({ user: session?.user ?? null, token: session?.token ?? null, login, logout, expire }), [session, login, logout, expire]);
-  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+  const value = useMemo(
+    () => ({
+      user: session?.user ?? null,
+      token: session?.token ?? null,
+      login,
+      logout,
+      expire,
+    }),
+    [session, login, logout, expire],
+  );
+  return (
+    <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
+  );
 }
 
 export function useSession(): SessionValue {
   const ctx = useContext(SessionContext);
-  if (!ctx) throw new Error('useSession must be used inside SessionProvider');
+  if (!ctx) throw new Error("useSession must be used inside SessionProvider");
   return ctx;
 }

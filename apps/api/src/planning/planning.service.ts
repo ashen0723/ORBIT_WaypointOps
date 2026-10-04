@@ -5,27 +5,28 @@ import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { Actor } from '../auth/auth.service';
 import { fail } from '../common/api-error';
+import { nextQuantities, remainingLines } from './quantity-plan';
 import { evaluatePlan } from './planning.engine';
 import { date, localInstant, object, planInput, text, version, weekStart } from './planning.input';
 
 type Tx = Prisma.TransactionClient;
-const tripInclude = { stops: { orderBy: { sequence: 'asc' as const }, include: { lines: true, order: true } } };
+export const tripInclude = { stops: { orderBy: { sequence: 'asc' as const }, include: { lines: true, order: true } } };
 type StoredTrip = Prisma.TripGetPayload<{ include: typeof tripInclude }>;
-const orderInclude = { outlet: true, lines: true, stops: true };
+export const orderInclude = { outlet: true, lines: true, stops: true };
 type StoredOrder = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   if (value && typeof value === 'object') return `{${Object.keys(value).sort().map(k => `${JSON.stringify(k)}:${canonical((value as Record<string, unknown>)[k])}`).join(',')}}`;
   return JSON.stringify(value);
 }
-const json = (value: unknown): Prisma.InputJsonValue => JSON.parse(JSON.stringify(value));
+export const json = (value: unknown): Prisma.InputJsonValue => JSON.parse(JSON.stringify(value));
 
 @Injectable()
 export class PlanningService {
   constructor(private readonly db: PrismaService) {}
 
   // The ledger result and business writes commit together. Serialization failures re-run validation.
-  private async mutate<T>(actor: Actor, kind: string, target: string, body: Record<string, unknown>, work: (tx: Tx) => Promise<T>): Promise<T> {
+  async mutate<T>(actor: Actor, kind: string, target: string, body: Record<string, unknown>, work: (tx: Tx) => Promise<T>): Promise<T> {
     const key = text(body.clientActionId, 'clientActionId');
     const hash = createHash('sha256').update(canonical({ kind, target, body })).digest('hex');
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -48,7 +49,7 @@ export class PlanningService {
     }
     throw new Error('Unreachable');
   }
-  private async audit(tx: Tx, actor: Actor, entityType: string, entityId: string, action: string, payload: unknown, reason?: string) {
+  async audit(tx: Tx, actor: Actor, entityType: string, entityId: string, action: string, payload: unknown, reason?: string) {
     await tx.auditEvent.create({ data: { actorId: actor.id, entityType, entityId, action, payload: json(payload), reason } });
   }
   private draftView(d: { id: string; version: number; plan: Prisma.JsonValue; updatedAt: Date }): PlanDraftView {
@@ -91,7 +92,16 @@ export class PlanningService {
       tx.travelLeg.findMany({ where: { fromKey: { in: keys }, toKey: { in: keys } } }),
       tx.outletHandling.findMany({ where: { outletId: { in: orders.map(o => o.outletId) } } }),
     ]);
-    const data = { vehicle, orders, trips, operatingDay, availability, legs, handling };
+    const historicalStops = orders.flatMap(o => o.stops);
+    const conflicts = historicalStops.length ? await tx.fieldConflict.findMany({ where: { resolvedAt: null, OR: historicalStops.flatMap(s => [
+      { action: { path: ['stopId'], equals: s.id } }, { action: { path: ['request', 'tripId'], equals: s.tripId } }, { action: { path: ['tripId'], equals: s.tripId } },
+    ]) } }) : [];
+    const legacyConflicts = historicalStops.length ? await tx.syncAction.findMany({ where: { status: 'CONFLICT', entityId: { in: historicalStops.flatMap(s => [s.id, s.tripId]) } } }) : [];
+    const conflictedOrderIds = orders.filter(o => o.stops.some(s => legacyConflicts.some(c => c.entityId === s.id || c.entityId === s.tripId) || conflicts.some(c => {
+      const a = c.action as { stopId?: string; tripId?: string; request?: { tripId?: string } };
+      return a.stopId === s.id || a.tripId === s.tripId || a.request?.tripId === s.tripId;
+    }))).map(o => o.id);
+    const data = { vehicle, orders, trips, operatingDay, availability, legs, handling, conflictedOrderIds };
     return { result: evaluatePlan(plan, data, replacingTripId), data };
   }
   private assertValid(result: ValidatePlanResponse): asserts result is Extract<ValidatePlanResponse, { valid: true }> {
@@ -109,7 +119,7 @@ export class PlanningService {
       return (await this.evaluate(tx, plan, replacing?.tripId)).result;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
-  private async editableTrip(tx: Tx, id: string, expected: number) {
+  async editableTrip(tx: Tx, id: string, expected: number) {
     const trip = await tx.trip.findUnique({ where: { id }, include: tripInclude });
     if (!trip) fail(404, 'NOT_FOUND', 'Trip not found.');
     if (trip.releasedAt || !['CONFIRMED', 'LOADING', 'READY'].includes(trip.status)) fail(409, 'TRIP_STATE_CONFLICT', 'Only an unreleased trip before departure can be changed.');
@@ -120,12 +130,12 @@ export class PlanningService {
     if (!trip.plannedDeparture) fail(422, 'REFERENCE_DATA_MISSING', 'Trip needs departure time backfill.');
     return planInput({ date: trip.date.toISOString().slice(0, 10), vehicleId: trip.vehicleId, depotId: trip.depotId, plannedDeparture: trip.plannedDeparture, orderIds: trip.stops.filter(s => s.active).map(s => s.orderId) });
   }
-  private async loadTrip(tx: Tx, id: string) {
+  async loadTrip(tx: Tx, id: string) {
     const trip = await tx.trip.findUnique({ where: { id }, include: tripInclude });
     if (!trip) fail(404, 'NOT_FOUND', 'Trip not found.');
     return trip;
   }
-  private tripView(t: StoredTrip): TripView {
+  tripView(t: StoredTrip): TripView {
     if (!t.driverId || !t.plannedDepartureAt || !t.plannedReturnAt || t.distanceKm === null || t.stops.some(s => s.sequence > 0 && !s.plannedArrivalAt)) fail(422, 'REFERENCE_DATA_MISSING', 'Legacy trip needs driver, timing and distance backfill.');
     return { id: t.id, version: t.version, planVersion: t.planVersion, vehicleId: t.vehicleId, driverId: t.driverId,
       depotId: t.depotId, date: t.date.toISOString().slice(0, 10), tripNo: t.tripNo as 1 | 2, status: t.status,
@@ -137,7 +147,7 @@ export class PlanningService {
         reschedule: s.reschedule as TripView['stops'][number]['reschedule'],
         lines: s.lines.map(l => ({ orderLineId: l.orderLineId, version: l.version, plannedQty: l.plannedQty, cancelledQty: l.cancelledQty, loadedQty: l.loadedQty, deliveredQty: l.deliveredQty, returnedQty: l.returnedQty })) })) };
   }
-  private orderView(o: StoredOrder): OrderView {
+  orderView(o: StoredOrder): OrderView {
     return { id: o.id, version: o.version, outletId: o.outletId, brand: o.outlet.brand, temp: o.temp,
       requestedDate: o.requestedDate.toISOString().slice(0, 10), plannedDate: o.plannedDate?.toISOString().slice(0, 10) ?? null,
       status: o.status, units: o.units, weightKg: o.weightKg, volumeM3: o.volumeM3,
@@ -166,10 +176,11 @@ export class PlanningService {
       const trip = await tx.trip.create({ data: { ...this.reservation(plan, result, data.vehicle!.drivers[0].id, slot), status: 'CONFIRMED' } });
       for (const stop of result.stops) {
         const order = data.orders.find(o => o.id === stop.orderId)!;
-        await tx.tripStop.create({ data: { tripId: trip.id, orderId: order.id, sequence: stop.sequence,
-          plannedArrivalAt: new Date(stop.arrivalAt), lines: { create: order.lines.map(l => ({ orderLineId: l.id, plannedQty: l.requestedQty })) } } });
+        const created = await tx.tripStop.create({ data: { tripId: trip.id, orderId: order.id, sequence: stop.sequence,
+          plannedArrivalAt: new Date(stop.arrivalAt), lines: { create: nextQuantities(order).filter(l => l.qty > 0).map(l => ({ orderLineId: l.orderLineId, plannedQty: l.qty })) } } });
+        await tx.recoveryDecision.updateMany({ where: { retryStopId: null, delivery: { stop: { orderId: order.id } }, decision: { path: ['action'], equals: 'REDELIVER' } }, data: { retryStopId: created.id } });
       }
-      await tx.order.updateMany({ where: { id: { in: plan.orderIds } }, data: { status: 'PLANNED', plannedDate: new Date(plan.date), version: { increment: 1 } } });
+      await tx.order.updateMany({ where: { id: { in: plan.orderIds } }, data: { status: 'PLANNED', pendingQuantities: Prisma.DbNull, plannedDate: new Date(plan.date), version: { increment: 1 } } });
       await tx.planDraft.update({ where: { id }, data: { allocatedTripId: trip.id, version: { increment: 1 } } });
       await this.audit(tx, actor, 'Trip', trip.id, 'ALLOCATED', { draftId: id, plan, totals: result.totals });
       return { trip: this.tripView(await this.loadTrip(tx, trip.id)) };
@@ -222,17 +233,18 @@ export class PlanningService {
       for (const s of removed) {
         // Archive the removed attempt under a unique negative sequence; preserve all line facts.
         await tx.tripStop.update({ where: { id: s.id }, data: { active: false, status: 'RESCHEDULED' } });
-        await tx.order.update({ where: { id: s.orderId }, data: { status: 'CONFIRMED', plannedDate: null, version: { increment: 1 } } });
+        await tx.order.update({ where: { id: s.orderId }, data: { status: 'CONFIRMED', pendingQuantities: json(remainingLines(s.lines)), plannedDate: null, version: { increment: 1 } } });
       }
       for (const stop of result.stops) {
         const existing = trip.stops.find(s => s.active && s.orderId === stop.orderId);
         if (existing) await tx.tripStop.update({ where: { id: existing.id }, data: { sequence: stop.sequence, plannedArrivalAt: new Date(stop.arrivalAt) } });
         else {
           const order = data.orders.find(o => o.id === stop.orderId)!;
-          await tx.tripStop.create({ data: { tripId: id, orderId: stop.orderId, sequence: stop.sequence, plannedArrivalAt: new Date(stop.arrivalAt), lines: { create: order.lines.map(l => ({ orderLineId: l.id, plannedQty: l.requestedQty })) } } });
+          const added = await tx.tripStop.create({ data: { tripId: id, orderId: stop.orderId, sequence: stop.sequence, plannedArrivalAt: new Date(stop.arrivalAt), lines: { create: nextQuantities(order).filter(l => l.qty > 0).map(l => ({ orderLineId: l.orderLineId, plannedQty: l.qty })) } } });
+          await tx.recoveryDecision.updateMany({ where: { retryStopId: null, delivery: { stop: { orderId: order.id } }, decision: { path: ['action'], equals: 'REDELIVER' } }, data: { retryStopId: added.id } });
         }
       }
-      await tx.order.updateMany({ where: { id: { in: plan.orderIds } }, data: { status: 'PLANNED', plannedDate: new Date(plan.date), version: { increment: 1 } } });
+      await tx.order.updateMany({ where: { id: { in: plan.orderIds } }, data: { status: 'PLANNED', pendingQuantities: Prisma.DbNull, plannedDate: new Date(plan.date), version: { increment: 1 } } });
       await tx.trip.update({ where: { id }, data: { ...this.reservation(plan, result, data.vehicle!.drivers[0].id, slot), status: 'CONFIRMED', version: { increment: 1 }, planVersion: { increment: 1 }, loaderAcknowledgedPlanVersion: null } });
       await tx.loadingRecord.updateMany({ where: { tripId: id }, data: { status: 'IN_PROGRESS', completedAt: null } });
       await this.audit(tx, actor, 'Trip', id, 'AMENDED', { beforePlan: this.planOf(trip), afterPlan: plan, previousPlanVersion: expected }, reason);
@@ -243,11 +255,11 @@ export class PlanningService {
     const body = object(input), expected = version(body.expectedPlanVersion, 'expectedPlanVersion'), reason = text(body.reason, 'reason');
     return this.mutate(actor, 'RELEASE', id, body, async tx => {
       const trip = await this.editableTrip(tx, id, expected);
-      if (trip.stops.some(s => s.lines.some(l => (l.loadedQty ?? 0) > 0 || l.pendingUnload || l.deliveredQty !== null || l.returnedQty !== null))) fail(409, 'UNLOAD_REQUIRED', 'Unloaded/reconciled goods are required before release.');
+      if (trip.stops.filter(s => s.active).some(s => s.lines.some(l => (l.loadedQty ?? 0) > 0 || l.pendingUnload || l.deliveredQty !== null || l.returnedQty !== null))) fail(409, 'UNLOAD_REQUIRED', 'Unloaded/reconciled goods are required before release.');
       const ids = trip.stops.filter(s => s.active).map(s => s.orderId), releasedAt = new Date();
       await tx.tripStop.updateMany({ where: { tripId: id, active: true }, data: { active: false, status: 'RESCHEDULED' } });
       await tx.trip.update({ where: { id }, data: { releasedAt, reservedFuelL: 0, loaderAcknowledgedPlanVersion: null, version: { increment: 1 }, planVersion: { increment: 1 } } });
-      await tx.order.updateMany({ where: { id: { in: ids } }, data: { status: 'CONFIRMED', plannedDate: null, version: { increment: 1 } } });
+      for (const stop of trip.stops.filter(s => s.active)) await tx.order.update({ where: { id: stop.orderId }, data: { status: 'CONFIRMED', pendingQuantities: json(remainingLines(stop.lines)), plannedDate: null, version: { increment: 1 } } });
       await this.audit(tx, actor, 'Trip', id, 'RELEASED', { orderIds: ids }, reason);
       const orders = await tx.order.findMany({ where: { id: { in: ids } }, include: orderInclude });
       return { tripId: id, releasedAt: releasedAt.toISOString(), orders: orders.map(o => this.orderView(o)) };

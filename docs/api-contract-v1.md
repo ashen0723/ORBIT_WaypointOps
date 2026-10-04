@@ -1,12 +1,15 @@
 # Waypoint API and workflow contract v1
 
+Implementation status and runnable end-to-end verification: [team integration](team-integration.md). The agreed wire DTOs below remain the integration boundary.
+
 **Baseline date:** 2026-10-04. **Domain owner:** Ashen. **Database/platform owner:** Tharusha.
 
 This is the implementation contract for the first connected four-role workflow. Ashen approved the
 scenario decisions below in the project conversation. Wire shapes are exported by `@waypoint/contracts`.
 The endpoints, persistence extensions and server validators described here are implementation targets:
 the initial contract change did not implement them. The planning backend now implements a subset; see
-[implementation status and setup](planning-backend.md). The browser still uses prototype data.
+[implementation status and setup](planning-backend.md) and [decisions/rescheduling](decisions-and-rescheduling.md).
+The browser still uses prototype data.
 
 ## Authority and scope
 

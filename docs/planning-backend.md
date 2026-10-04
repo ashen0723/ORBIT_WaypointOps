@@ -1,5 +1,7 @@
 # Planning backend milestone
 
+> Integration update: the real four-role workspace and connected Order/Delivery/Receipt/Sync APIs are now implemented. See [team integration and verification](team-integration.md) for current setup, migrations and test evidence; older handoff notes below describe the earlier phase.
+
 This milestone implements a persistent, authenticated Draft → Allocate → Publish API. The browser
 prototypes are not connected to these endpoints yet. Contract DTOs remain in `@waypoint/contracts`;
 the API consumes emitted declarations, and runtime input validation lives in the API.
@@ -54,8 +56,8 @@ Example draft body (POST `/api/planning/drafts`):
 Use the response `id`/`version` for POST `/api/planning/allocate` with
 `{clientActionId, draftId, expectedDraftVersion}`. Then publish with
 `{clientActionId, trips:[{tripId, expectedPlanVersion}]}`. Login as the Loader to retrieve `/api/loader/trips`.
-Loading line writes/start/issue decisions belong to the Loader module and are not implemented here;
-`ready` checks its persisted records, rather than inventing loaded quantities.
+Loading start/line checks/issue reporting, Dispatcher decisions and Loader acknowledgement are now implemented.
+See [decisions and rescheduling](decisions-and-rescheduling.md) for routes and integration handoffs.
 
 ## Validation and persistence
 
@@ -85,28 +87,25 @@ Loading line writes/start/issue decisions belong to the Loader module and are no
 - Historical trips missing driver/timing/fuel data require an explicit backfill before using their vehicle for further
   planning. The migration does not invent past mileage, fuel or drivers.
 
-## Database foundation for other owners
+## Decisions and remaining owner handoffs
 
-`Order.version/recoveryPending`, `OrderLine.cancelledQty`, `QuantityCancellation`, `ReceiptLine`,
-`Delivery.version/requiresDispatcherReview`, `RecoveryDecision`, `FieldConflict`, FROZEN and historical
-Order→TripStop relations are present. Their domain endpoints/validation are still their owners' work:
-creating these tables does not implement cancellation, receipt reconciliation or offline recovery.
-Existing OrderLine loaded/delivered fields remain for compatibility; future handlers must keep any aggregate
-fields in sync while storing authoritative attempt facts in TripStopLine. Quantity/source/actor relationships
-and JSON recovery payloads still require owner-level transactional validation, not arbitrary direct writes.
+Migration `0003_decisions_and_rescheduling` adds decision/acknowledgement stamps, exact per-line load factors,
+authorized pending quantities and deferral history. Shortfall/replacement decisions, recovery decisions and
+retry-only allocation, deferral, in-transit reschedule and Driver return acknowledgement are implemented.
+See [decisions and rescheduling](decisions-and-rescheduling.md) for the full behavior and examples.
 
-Initial allocation supports eligible CONFIRMED/DEFERRED whole orders. It rejects unresolved recovery/cancelled
-balances instead of reassigning original requested quantities. Authorized recovery allocation, Store order creation
-and cutoff/brand scheduling, deferral/reschedule routes, loading operations, Driver departure/delivery and offline
-reconciliation remain separate handoffs. The frontend still needs to replace mock services with these APIs.
+Store order creation and cutoff/brand scheduling, Driver departure/delivery writes, Store receipt submission,
+evidence storage and offline conflict capture/resolution remain separate owner work. The new endpoints consume
+persisted Delivery/Receipt facts and refuse inconsistent quantities. The frontend still uses mock services.
 
 ## Verification
 
 - `npm test`: contract checks, existing web tests, planning feasibility/date/parser tests and health tests.
-- `npm run test:integration -w apps/api`: builds, applies both real SQL migrations to disposable PGlite PostgreSQL,
+- `npm run test:integration -w apps/api`: builds, applies all three real SQL migrations to disposable PGlite PostgreSQL,
   starts the Nest API on an ephemeral localhost port, and exercises auth/scopes, draft reservations, allocation replay,
   atomic publish rollback/visibility, amendment/ack/readiness, unload/release, historical retries, concurrent HTTP
-  allocation requests and database unique constraints. No user database is used. PGlite requires a single pooled
+  allocation/recovery requests, shortfall cancellation, retry quantities, deferral history, reschedule return/conflict
+  gates and database unique constraints. No user database is used. PGlite requires a single pooled
   connection, so this does **not** verify native PostgreSQL serializable multi-connection races.
 - `TEST_DATABASE_URL=... npm run test:postgres -w apps/api`: runs the same suite on native PostgreSQL with 10 pooled
   connections and concurrent allocation. It creates a uniquely named test schema and drops only that schema in cleanup.
