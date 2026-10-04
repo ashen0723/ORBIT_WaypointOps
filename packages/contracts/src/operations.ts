@@ -116,6 +116,8 @@ export type RecoveryDecision =
   | { action: 'CLOSE_WITHOUT_REDELIVERY'; lines: NonEmptyList<{ orderLineId: Id; qty: number }>; reason: string };
 export interface RecoveryDecisionRequest extends VersionedMutation { decision: RecoveryDecision }
 export interface RecoveryView {
+  /** Updated Delivery.version for the next decision on this source attempt. */
+  sourceDeliveryVersion: number;
   id: Id;
   sourceDeliveryId: Id;
   decision: RecoveryDecision;

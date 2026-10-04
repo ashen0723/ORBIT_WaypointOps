@@ -1,11 +1,14 @@
 import type { PlanInput, PlanningReason, ValidatePlanResponse } from '@waypoint/contracts';
 import type { Prisma, Trip, Vehicle, TravelLeg, OperatingDay, OutletHandling, VehicleAvailability } from '../generated/prisma/client';
+import { nextQuantities, quantityTotals } from './quantity-plan';
+import { HttpException } from '@nestjs/common';
 import { localInstant, weekStart } from './planning.input';
 
 export type PlanningOrder = Prisma.OrderGetPayload<{ include: { outlet: true; lines: true; stops: { include: { lines: true } } } }>;
 export interface PlanningData {
   vehicle: (Vehicle & { drivers: { id: string }[] }) | null;
   orders: PlanningOrder[];
+  conflictedOrderIds?: string[];
   trips: Trip[];
   operatingDay: OperatingDay | null;
   availability: VehicleAvailability | null;
@@ -34,19 +37,26 @@ export function evaluatePlan(plan: PlanInput, data: PlanningData, replacingTripI
   for (let i = 0; i < orders.length; i++) {
     const order = orders[i];
     if (!order) { invalidReference('Order does not exist.', plan.orderIds[i]); continue; }
+    if (data.conflictedOrderIds?.includes(order.id)) add('ORDER_NOT_ELIGIBLE', 'Reconcile preserved offline facts before reallocating this order.', order.id);
     const own = order.stops.find(s => s.active && s.tripId === replacingTripId);
     if (order.stops.some(s => s.active && s.tripId !== replacingTripId)) add('DUPLICATE_ASSIGNMENT', 'Order already has an active assignment.', order.id);
-    if ((!own && !['CONFIRMED', 'DEFERRED'].includes(order.status)) || order.recoveryPending) add('ORDER_NOT_ELIGIBLE', 'Order is not available for initial allocation; unresolved recovery must be reconciled first.', order.id);
+    if ((!own && !['CONFIRMED', 'DEFERRED'].includes(order.status)) || (order.recoveryPending && order.pendingQuantities === null && !own)) add('ORDER_NOT_ELIGIBLE', 'Order is not available for initial allocation; unresolved recovery must be reconciled first.', order.id);
     const earliest = order.deferredToDate ?? order.plannedDate ?? order.requestedDate;
     if (plan.date < earliest.toISOString().slice(0, 10)) add('ORDER_NOT_ELIGIBLE', 'Cannot allocate before the eligible delivery date.', order.id);
     if (order.outlet.depotId !== plan.depotId) add('DEPOT_MISMATCH', 'Outlet belongs to another depot.', order.id);
     if (vehicle && order.temp !== 'AMBIENT' && vehicle.temp !== 'REEFER') add('REEFER_REQUIRED', 'Chilled/frozen orders require a reefer.', order.id);
     if (vehicle && order.outlet.parkingConstraint === 'VAN_ONLY' && vehicle.type !== 'VAN') add('VAN_REQUIRED', 'Outlet requires a van.', order.id);
     if (!order.lines.length || order.lines.some(l => !Number.isInteger(l.requestedQty) || l.requestedQty <= 0)) invalidReference('Order has no valid requested quantities.', order.id);
-    // Until cancellation/recovery handlers supply load factors, never silently reallocate reduced orders at original quantities.
-    if (order.lines.some(l => l.cancelledQty > 0) && !own) add('ORDER_NOT_ELIGIBLE', 'A cancelled/recovery balance requires an authorized quantity plan.', order.id);
     if (![order.weightKg, order.volumeM3].every(x => Number.isFinite(x) && x >= 0)) invalidReference('Order weight or volume is invalid.', order.id);
-    weight += order.weightKg; volume += order.volumeM3;
+    try {
+      const totals = quantityTotals(order, nextQuantities(order, own?.lines));
+      weight += totals.weightKg; volume += totals.volumeM3;
+    } catch (error) {
+      if (!(error instanceof HttpException)) throw error;
+      const body = error.getResponse() as { code: string; message: string };
+      if (body.code === 'ORDER_NOT_ELIGIBLE') add('ORDER_NOT_ELIGIBLE', body.message, order.id);
+      else invalidReference(body.message, order.id);
+    }
   }
   if (vehicle && weight > vehicle.weightCapKg) add('WEIGHT_EXCEEDED', 'Load exceeds weight capacity.', vehicle.id, 'vehicleId', weight, vehicle.weightCapKg);
   if (vehicle && volume > vehicle.volumeCapM3) add('VOLUME_EXCEEDED', 'Load exceeds volume capacity.', vehicle.id, 'vehicleId', volume, vehicle.volumeCapM3);

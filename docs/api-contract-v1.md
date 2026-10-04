@@ -6,7 +6,8 @@ This is the implementation contract for the first connected four-role workflow. 
 scenario decisions below in the project conversation. Wire shapes are exported by `@waypoint/contracts`.
 The endpoints, persistence extensions and server validators described here are implementation targets:
 the initial contract change did not implement them. The planning backend now implements a subset; see
-[implementation status and setup](planning-backend.md). The browser still uses prototype data.
+[implementation status and setup](planning-backend.md) and [decisions/rescheduling](decisions-and-rescheduling.md).
+The browser still uses prototype data.
 
 ## Authority and scope
 

@@ -39,7 +39,7 @@ Password for every account: `waypoint-demo` (set by `SEED_DEMO_PASSWORD`).
 | Store Manager | `store@waypoint.lk` | `/store` |
 | Store Manager (2nd outlet, permission checks) | `store2@waypoint.lk` | `/store` |
 
-The browser still uses prototype sessions/data; the backend now has JWT login and planning endpoints.
+The browser still uses prototype sessions/data; the backend now has JWT login, planning, shortfall/recovery decisions, deferral and rescheduling endpoints.
 See [Planning backend](docs/planning-backend.md) for API setup and its current scope.
 
 Sessions are per browser tab: open one tab per role to follow an order across roles.
@@ -124,6 +124,7 @@ _To be completed by module owners._ Merge-level changes are in [docs/merge-notes
 
 - [API and workflow contract v1](docs/api-contract-v1.md) — agreed rules, shared DTOs, endpoint ownership,
   and endpoint ownership. [Planning backend](docs/planning-backend.md) tracks implemented routes and remaining handoffs.
+- [Shortfall, recovery, deferral and rescheduling](docs/decisions-and-rescheduling.md)
 - [Architecture](docs/architecture.md)
 - [Data model](docs/data-model.md)
 - [AI tool disclosure](docs/ai-disclosure.md)

@@ -27,7 +27,7 @@ async function main() {
       database = { exec: sql => admin.query(sql), query: (sql, args) => admin.query(sql, args) };
       process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
     } else database = await PGlite.create();
-    for (const migration of ['0001_init', '0002_planning_contract']) {
+    for (const migration of ['0001_init', '0002_planning_contract', '0003_decisions_and_rescheduling']) {
       console.log(`Applying ${migration}`);
       const sql = (await readFile(join(__dirname, '../prisma/migrations', migration, 'migration.sql'), 'utf8')).replace('CREATE SCHEMA IF NOT EXISTS "public";', '');
       // These migrations contain no procedural bodies; preserve their explicit transaction boundaries.
@@ -151,6 +151,7 @@ async function main() {
     assert.equal(await db.tripStop.count({ where: { orderId: 'O3', active: true } }), 1);
     assert.equal(await db.trip.count({ where: { releasedAt: null } }), 2);
     assert.equal((await db.trip.aggregate({ where: { releasedAt: null }, _sum: { reservedFuelL: true } }))._sum.reservedFuelL, 20);
+    await require('./decisions.scenarios.cjs')({ db, request, base, tokens });
     // Database-level uniqueness survives code paths outside the service too.
     await assert.rejects(database.query('INSERT INTO "TripStop" ("id", "tripId", "orderId", "sequence", "updatedAt") VALUES ($1,$2,$3,99,now())', ['duplicate-stop', next.id, 'O2']), e => e.code === '23505');
     await assert.rejects(database.query('INSERT INTO "Trip" ("id", "vehicleId", "depotId", "date", "tripNo", "updatedAt") VALUES ($1,$2,$3,$4,1,now())', ['duplicate-trip', 'V', 'D', day]), e => e.code === '23505');

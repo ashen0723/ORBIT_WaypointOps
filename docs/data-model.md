@@ -1,7 +1,8 @@
 # Data model
 
 The [API and workflow contract v1](api-contract-v1.md) records the agreed cancellation, delivery-attempt,
-plan-version and sync behavior. Migration `0002_planning_contract` adds the planning and quantity-history foundation.
+plan-version and sync behavior. Migration `0002_planning_contract` adds the planning and quantity-history foundation;
+`0003_decisions_and_rescheduling` adds the decision/acknowledgement stamps, pending quantities and deferral history.
 See [planning implementation status](planning-backend.md) for the implemented mappings and remaining owner work.
 
 Source of truth: [`apps/api/prisma/schema.prisma`](../apps/api/prisma/schema.prisma) (draft; owners refine

@@ -212,12 +212,15 @@ model Order {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
-  outlet          Outlet      @relation(fields: [outletId], references: [id])
-  createdBy       User        @relation("OrderCreatedBy", fields: [createdById], references: [id])
-  lines           OrderLine[]
-  stops           TripStop[]
-  version         Int         @default(1)
-  recoveryPending Boolean     @default(false)
+  outlet            Outlet          @relation(fields: [outletId], references: [id])
+  createdBy         User            @relation("OrderCreatedBy", fields: [createdById], references: [id])
+  lines             OrderLine[]
+  stops             TripStop[]
+  version           Int             @default(1)
+  recoveryPending   Boolean         @default(false)
+  // Server-authorized next-attempt quantities. Null means an untouched initial order.
+  pendingQuantities Json?
+  deferrals         OrderDeferral[]
 
   @@index([outletId, requestedDate])
   @@index([status])
@@ -230,6 +233,8 @@ model OrderLine {
   unit         String
   requestedQty Int
   cancelledQty Int      @default(0)
+  unitWeightKg Float?
+  unitVolumeM3 Float?
   loadedQty    Int?
   deliveredQty Int?
   createdAt    DateTime @default(now())
@@ -321,17 +326,27 @@ model LoadingRecord {
 }
 
 model LoadingIssue {
-  id              String             @id @default(cuid())
-  loadingRecordId String
-  orderLineId     String
-  type            LoadingIssueType
-  expectedQty     Int
-  availableQty    Int
-  note            String?
-  decision        String? // dispatcher decision text
-  status          LoadingIssueStatus @default(OPEN)
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  id                  String             @id @default(cuid())
+  loadingRecordId     String
+  orderLineId         String
+  type                LoadingIssueType
+  expectedQty         Int
+  availableQty        Int
+  note                String?
+  decision            String? // legacy description; structured decisions use decisionData
+  decisionData        Json?
+  version             Int                @default(1)
+  stopId              String?
+  reportedPlanVersion Int                @default(1)
+  decidedById         String?
+  decidedAt           DateTime?
+  acknowledgedById    String?
+  acknowledgedAt      DateTime?
+  cancelledQty        Int                @default(0)
+  photoRefs           String[]
+  status              LoadingIssueStatus @default(OPEN)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   loadingRecord LoadingRecord @relation(fields: [loadingRecordId], references: [id], onDelete: Cascade)
   orderLine     OrderLine     @relation(fields: [orderLineId], references: [id])
@@ -495,8 +510,10 @@ model RecoveryDecision {
   decision         Json
   decidedById      String
   decidedAt        DateTime @default(now())
-  retryStopId      String?  @unique
+  retryStopId      String?
   delivery         Delivery @relation(fields: [sourceDeliveryId], references: [id])
+
+  @@index([retryStopId])
 }
 
 model FieldConflict {
@@ -555,4 +572,18 @@ model VehicleAvailability {
   available Boolean
 
   @@unique([vehicleId, date])
+}
+
+model OrderDeferral {
+  id           String    @id @default(cuid())
+  orderId      String
+  fromDate     DateTime? @db.Date
+  toDate       DateTime  @db.Date
+  reason       String
+  actorId      String
+  recordedAt   DateTime  @default(now())
+  sourceStopId String?   @unique
+  order        Order     @relation(fields: [orderId], references: [id])
+
+  @@index([orderId, recordedAt])
 }
