@@ -109,3 +109,15 @@ export interface LoadingStartResult {
   startedAt: string | null;
   alreadyStarted: boolean;
 }
+
+export interface UpdateLoadedQuantityBody {
+  loadedQty: number;
+}
+
+export interface LoadedQuantityResult {
+  orderLineId: string;
+  tripId: string;
+  expectedQty: number;
+  loadedQty: number;
+  complete: boolean;
+}

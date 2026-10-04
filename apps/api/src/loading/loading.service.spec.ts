@@ -220,4 +220,96 @@ describe('LoadingService', () => {
       id: 'USR-LDR', depotId: 'DEP-PLG',
     })).rejects.toMatchObject({ status: 409 });
   });
+
+  it('persists a valid loaded quantity and audit event', async () => {
+    const findUnique = jest.fn().mockResolvedValue({
+      id: 'LINE-1', requestedQty: 20, loadedQty: null,
+      order: {
+        stop: {
+          trip: {
+            id: 'TRIP-1', depotId: 'DEP-PLG', status: 'LOADING',
+            loadingRecord: { status: 'IN_PROGRESS' },
+          },
+        },
+      },
+    });
+    const updateLine = jest.fn().mockResolvedValue({
+      id: 'LINE-1', requestedQty: 20, loadedQty: 16,
+    });
+    const createAudit = jest.fn().mockResolvedValue({});
+    const transaction = jest.fn(async (callback) => callback({
+      orderLine: { update: updateLine },
+      auditEvent: { create: createAudit },
+    }));
+    const quantityService = new LoadingService({
+      orderLine: { findUnique }, $transaction: transaction,
+    } as unknown as PrismaService);
+
+    await expect(quantityService.updateLoadedQuantity('LINE-1', 16, {
+      id: 'USR-LDR', depotId: 'DEP-PLG',
+    })).resolves.toEqual({
+      orderLineId: 'LINE-1', tripId: 'TRIP-1', expectedQty: 20,
+      loadedQty: 16, complete: false,
+    });
+
+    expect(updateLine).toHaveBeenCalledWith({
+      where: { id: 'LINE-1' }, data: { loadedQty: 16 },
+    });
+    expect(createAudit).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        actorId: 'USR-LDR', action: 'LOADED_QUANTITY_UPDATED',
+        payload: expect.objectContaining({ previousLoadedQty: 0, loadedQty: 16 }),
+      }),
+    });
+  });
+
+  it.each([-1, 1.5, Number.NaN])('rejects invalid loaded quantity %s', async (loadedQty) => {
+    const quantityService = new LoadingService({} as PrismaService);
+
+    await expect(quantityService.updateLoadedQuantity('LINE-1', loadedQty, {
+      id: 'USR-LDR', depotId: 'DEP-PLG',
+    })).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('rejects a quantity above the expected amount', async () => {
+    const findUnique = jest.fn().mockResolvedValue({
+      id: 'LINE-1', requestedQty: 20, loadedQty: 0,
+      order: {
+        stop: {
+          trip: {
+            id: 'TRIP-1', depotId: 'DEP-PLG', status: 'LOADING',
+            loadingRecord: { status: 'IN_PROGRESS' },
+          },
+        },
+      },
+    });
+    const quantityService = new LoadingService({
+      orderLine: { findUnique },
+    } as unknown as PrismaService);
+
+    await expect(quantityService.updateLoadedQuantity('LINE-1', 21, {
+      id: 'USR-LDR', depotId: 'DEP-PLG',
+    })).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('rejects changes outside an active loading record', async () => {
+    const findUnique = jest.fn().mockResolvedValue({
+      id: 'LINE-1', requestedQty: 20, loadedQty: 0,
+      order: {
+        stop: {
+          trip: {
+            id: 'TRIP-1', depotId: 'DEP-PLG', status: 'READY',
+            loadingRecord: { status: 'COMPLETED' },
+          },
+        },
+      },
+    });
+    const quantityService = new LoadingService({
+      orderLine: { findUnique },
+    } as unknown as PrismaService);
+
+    await expect(quantityService.updateLoadedQuantity('LINE-1', 20, {
+      id: 'USR-LDR', depotId: 'DEP-PLG',
+    })).rejects.toMatchObject({ status: 409 });
+  });
 });

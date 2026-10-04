@@ -1,7 +1,13 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
   LoaderQueueStatus,
+  LoadedQuantityResult,
   LoadingStartResult,
   LoaderTripDetail,
   LoaderTripSummary,
@@ -271,6 +277,81 @@ export class LoadingService {
         checkedById: loadingRecord.checkedById,
         startedAt: loadingRecord.startedAt?.toISOString() ?? null,
         alreadyStarted: false,
+      };
+    });
+  }
+
+  async updateLoadedQuantity(
+    lineId: string,
+    loadedQty: number,
+    loader: { id: string; depotId: string },
+  ): Promise<LoadedQuantityResult> {
+    if (!Number.isInteger(loadedQty) || loadedQty < 0) {
+      throw new BadRequestException('loadedQty must be a non-negative whole number.');
+    }
+
+    const line = await this.prisma.orderLine.findUnique({
+      where: { id: lineId },
+      include: {
+        order: {
+          include: {
+            stop: {
+              include: {
+                trip: {
+                  include: { loadingRecord: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const trip = line?.order.stop?.trip;
+
+    if (!line || !trip || trip.depotId !== loader.depotId) {
+      throw new NotFoundException('Loading line not found for this Loader depot.');
+    }
+
+    if (trip.status !== 'LOADING' || trip.loadingRecord?.status !== 'IN_PROGRESS') {
+      throw new ConflictException('Loaded quantities can only be changed while loading is in progress.');
+    }
+
+    if (loadedQty > line.requestedQty) {
+      throw new BadRequestException(
+        `loadedQty cannot exceed the expected quantity of ${line.requestedQty}.`,
+      );
+    }
+
+    const previousLoadedQty = line.loadedQty ?? 0;
+
+    return this.prisma.$transaction(async (transaction) => {
+      const updatedLine = await transaction.orderLine.update({
+        where: { id: lineId },
+        data: { loadedQty },
+      });
+
+      await transaction.auditEvent.create({
+        data: {
+          actorId: loader.id,
+          entityType: 'OrderLine',
+          entityId: lineId,
+          action: 'LOADED_QUANTITY_UPDATED',
+          payload: {
+            tripId: trip.id,
+            expectedQty: line.requestedQty,
+            previousLoadedQty,
+            loadedQty,
+          },
+        },
+      });
+
+      return {
+        orderLineId: updatedLine.id,
+        tripId: trip.id,
+        expectedQty: updatedLine.requestedQty,
+        loadedQty: updatedLine.loadedQty ?? 0,
+        complete: updatedLine.loadedQty === updatedLine.requestedQty,
       };
     });
   }

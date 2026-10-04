@@ -3,9 +3,16 @@ import { LoadingOperationsController } from './loading-operations.controller';
 
 describe('LoadingOperationsController', () => {
   const startLoading = jest.fn();
-  const controller = new LoadingOperationsController({ startLoading } as unknown as LoadingService);
+  const updateLoadedQuantity = jest.fn();
+  const controller = new LoadingOperationsController({
+    startLoading,
+    updateLoadedQuantity,
+  } as unknown as LoadingService);
 
-  beforeEach(() => startLoading.mockReset());
+  beforeEach(() => {
+    startLoading.mockReset();
+    updateLoadedQuantity.mockReset();
+  });
 
   it('starts loading as the authenticated Loader', async () => {
     startLoading.mockResolvedValue({ loadingRecordId: 'LOAD-1' });
@@ -15,6 +22,18 @@ describe('LoadingOperationsController', () => {
     })).resolves.toEqual({ loadingRecordId: 'LOAD-1' });
 
     expect(startLoading).toHaveBeenCalledWith('TRIP-1', {
+      id: 'USR-LDR', role: 'LOADER', depotId: 'DEP-PLG',
+    });
+  });
+
+  it('updates a loaded quantity as the authenticated Loader', async () => {
+    updateLoadedQuantity.mockResolvedValue({ orderLineId: 'LINE-1', loadedQty: 16 });
+
+    await expect(controller.updateLoadedQuantity('LINE-1', { loadedQty: 16 }, {
+      user: { id: 'USR-LDR', role: 'LOADER', depotId: 'DEP-PLG' },
+    })).resolves.toEqual({ orderLineId: 'LINE-1', loadedQty: 16 });
+
+    expect(updateLoadedQuantity).toHaveBeenCalledWith('LINE-1', 16, {
       id: 'USR-LDR', role: 'LOADER', depotId: 'DEP-PLG',
     });
   });
