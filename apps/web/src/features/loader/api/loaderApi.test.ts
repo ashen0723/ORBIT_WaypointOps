@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mapLoaderTripSummary } from './loaderApi';
+import { mapLoaderTripDetail, mapLoaderTripSummary } from './loaderApi';
 
 describe('mapLoaderTripSummary', () => {
   it('maps the backend trip contract to a Loader queue card', () => {
@@ -35,6 +35,60 @@ describe('mapLoaderTripSummary', () => {
     })).toMatchObject({
       departure: 'Not scheduled', brand: 'Mixed', district: 'No stops',
       status: 'ready_to_load', priority: 'Standard', vehicleType: 'Van', temperature: 'Ambient',
+    });
+  });
+});
+
+describe('mapLoaderTripDetail', () => {
+  it('maps ordered stops, actual quantities, and persisted issues', () => {
+    const mapped = mapLoaderTripDetail({
+      tripId: 'TRIP-1', vehicleId: 'TRK-021', tripNo: 1,
+      date: '2026-10-05', plannedDeparture: '05:30', tripStatus: 'LOADING',
+      plannedWeightKg: 640, plannedVolumeM3: 8.5,
+      vehicle: {
+        type: 'TRUCK', temperature: 'REEFER',
+        weightCapacityKg: 1000, volumeCapacityM3: 18,
+      },
+      loadingRecord: {
+        id: 'LOAD-1', status: 'IN_PROGRESS', checkedById: 'USR-LDR',
+        startedAt: '2026-10-05T04:30:00.000Z', completedAt: null,
+      },
+      stops: [{
+        tripStopId: 'STOP-1', sequence: 1, etaTime: '06:15',
+        order: {
+          orderId: 'ORD-1', temperature: 'CHILLED', weightKg: 120, volumeM3: 2.5,
+          outlet: {
+            outletId: 'OUT-001', name: 'FreshMart Colombo 05', district: 'Colombo',
+            brand: 'FRESH', dockType: 'REAR_DOCK', parkingConstraint: 'NORMAL',
+            deliveryWindow: { opensAt: '04:00', closesAt: '08:00', mallWindow: null },
+          },
+          lines: [{
+            orderLineId: 'LINE-1', item: 'Milk cases', unit: 'cases',
+            expectedQty: 20, loadedQty: 16,
+          }],
+        },
+      }],
+      issues: [{
+        issueId: 'ISSUE-1', orderLineId: 'LINE-1', type: 'MISSING',
+        expectedQty: 20, availableQty: 16, note: 'Four unavailable',
+        evidenceRef: 'uploads/issues/photo.jpg', decision: 'Ship short', status: 'SHIP_SHORT',
+        acknowledgedById: 'USR-LDR', acknowledgedAt: '2026-10-05T05:00:00.000Z',
+        createdAt: '2026-10-05T04:45:00.000Z', updatedAt: '2026-10-05T05:00:00.000Z',
+      }],
+    });
+
+    expect(mapped.trip).toMatchObject({
+      tripId: 'TRIP-1',
+      orders: [{
+        id: 'ORD-1', stop: 1,
+        items: [{ id: 'LINE-1', expected: 20, loaded: 16, condition: 'chilled' }],
+      }],
+      stops: [{ id: 'STOP-1', number: 1, eta: '06:15' }],
+    });
+    expect(mapped.quantities).toEqual({ 'LINE-1': 16 });
+    expect(mapped.issues['LINE-1']).toMatchObject({
+      resolution: 'ship_short', decisionReceived: true,
+      approvedShipQuantity: 16, cancelledQuantity: 4,
     });
   });
 });

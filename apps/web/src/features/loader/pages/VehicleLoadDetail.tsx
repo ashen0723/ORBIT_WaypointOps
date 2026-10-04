@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect } from 'react';
 import {
   Link,
   useParams,
@@ -8,6 +8,7 @@ import {
   CircleAlertIcon,
   ListOrderedIcon,
   PackageIcon,
+  RefreshCwIcon,
 } from 'lucide-react';
 
 import { useLoader } from '../contexts/LoaderContext';
@@ -43,6 +44,9 @@ export function VehicleLoadDetail() {
     confirmedItemIds,
     setLoadedQuantity,
     markItemLoaded,
+    tripLoadingId,
+    tripErrors,
+    loadTrip,
   } = useLoader();
 
   const tripId =
@@ -59,6 +63,17 @@ export function VehicleLoadDetail() {
       ]
       : undefined;
 
+  useEffect(() => {
+    if (
+      tripId &&
+      !tripData &&
+      tripLoadingId !== tripId &&
+      !tripErrors[tripId]
+    ) {
+      void loadTrip(tripId);
+    }
+  }, [loadTrip, tripData, tripErrors, tripId, tripLoadingId]);
+
   if (!tripId) {
     return (
       <LoadUnavailable />
@@ -66,6 +81,9 @@ export function VehicleLoadDetail() {
   }
 
   if (!tripData) {
+    const loading = tripLoadingId === tripId;
+    const error = tripErrors[tripId];
+
     return (
       <PageContainer>
         <Card className="mx-auto max-w-lg p-8 text-center">
@@ -77,25 +95,32 @@ export function VehicleLoadDetail() {
           </span>
 
           <h1 className="mt-4 text-xl font-semibold text-ink">
-            Loading trip
-            unavailable
+            {loading ? 'Loading trip…' : error ? 'Could not load trip' : 'Loading trip unavailable'}
           </h1>
 
           <p className="mt-2 text-sm leading-6 text-subtle">
-            This trip is not
-            currently available
-            in the Loader
-            workspace. Return to
-            the queue and select
-            a published trip.
+            {loading
+              ? 'Retrieving the published stop sequence and loading list.'
+              : error ?? 'This trip is not currently available in the Loader workspace.'}
           </p>
+
+          {error && (
+            <button
+              type="button"
+              onClick={() => void loadTrip(tripId)}
+              className={`${buttonStyles('secondary', 'md')} mt-6`}
+            >
+              <RefreshCwIcon aria-hidden="true" className="h-4 w-4" />
+              Try again
+            </button>
+          )}
 
           <Link
             to="/"
             className={`${buttonStyles(
               'primary',
               'md',
-            )} mt-6`}
+            )} mt-6 ${error ? 'ml-3' : ''}`}
           >
             Back to Loading Queue
           </Link>
@@ -111,9 +136,7 @@ export function VehicleLoadDetail() {
   } = tripData;
 
   const ordersWithCurrentQuantities =
-    useMemo(
-      () =>
-        orders.map(
+    orders.map(
           (order) => ({
             ...order,
 
@@ -130,23 +153,12 @@ export function VehicleLoadDetail() {
                 }),
               ),
           }),
-        ),
-      [
-        orders,
-        quantities,
-      ],
-    );
+        );
 
   const totals =
-    useMemo(
-      () =>
         computeLoadTotals(
           ordersWithCurrentQuantities,
-        ),
-      [
-        ordersWithCurrentQuantities,
-      ],
-    );
+        );
 
   const percent =
     loadCheckPercent(

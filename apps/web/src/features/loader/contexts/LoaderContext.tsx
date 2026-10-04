@@ -17,7 +17,7 @@ import type {
   LoaderIssueType,
 } from '../types/loader';
 import { useAuth } from '../../../app/providers/AuthProvider';
-import { fetchLoaderTrips } from '../api/loaderApi';
+import { fetchLoaderTrip, fetchLoaderTrips } from '../api/loaderApi';
 
 export interface LoaderTripView {
   tripId: string;
@@ -37,6 +37,9 @@ interface LoaderContextValue {
   queueLoading: boolean;
   queueError: string | null;
   refreshQueue: () => Promise<void>;
+  tripLoadingId: string | null;
+  tripErrors: Record<string, string>;
+  loadTrip: (tripId: string) => Promise<void>;
 
   tripDataById: Record<string, LoaderTripView>;
 
@@ -125,6 +128,8 @@ export function LoaderProvider({
 
   const [queueLoading, setQueueLoading] = useState(false);
   const [queueError, setQueueError] = useState<string | null>(null);
+  const [tripLoadingId, setTripLoadingId] = useState<string | null>(null);
+  const [tripErrors, setTripErrors] = useState<Record<string, string>>({});
 
   const [
     tripDataById,
@@ -186,6 +191,39 @@ export function LoaderProvider({
     void refreshQueue();
   }, [refreshQueue]);
 
+  const loadTrip = useCallback(async (tripId: string) => {
+    if (!token) {
+      setTripErrors((current) => ({ ...current, [tripId]: 'Sign in to view this loading trip.' }));
+      return;
+    }
+
+    setTripLoadingId(tripId);
+    setTripErrors((current) => {
+      const next = { ...current };
+      delete next[tripId];
+      return next;
+    });
+
+    try {
+      const mapped = await fetchLoaderTrip(
+        token,
+        tripId,
+        queueLoads.find((load) => load.tripId === tripId),
+      );
+      setTripDataById((current) => ({ ...current, [tripId]: mapped.trip }));
+      setQuantities((current) => ({ ...current, ...mapped.quantities }));
+      setConfirmedItemIds((current) => [...new Set([...current, ...mapped.confirmedItemIds])]);
+      setIssues((current) => ({ ...current, ...mapped.issues }));
+    } catch (error) {
+      setTripErrors((current) => ({
+        ...current,
+        [tripId]: error instanceof Error ? error.message : 'Could not load this trip.',
+      }));
+    } finally {
+      setTripLoadingId((current) => current === tripId ? null : current);
+    }
+  }, [queueLoads, token]);
+
   const value =
     useMemo<LoaderContextValue>(
       () => ({
@@ -193,6 +231,9 @@ export function LoaderProvider({
         queueLoading,
         queueError,
         refreshQueue,
+        tripLoadingId,
+        tripErrors,
+        loadTrip,
         tripDataById,
         quantities,
         confirmedItemIds,
@@ -622,6 +663,9 @@ export function LoaderProvider({
         queueLoading,
         queueError,
         refreshQueue,
+        tripLoadingId,
+        tripErrors,
+        loadTrip,
         reviewedPlanVehicleIds,
         tripDataById,
       ],
