@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Loader2Icon, TriangleAlertIcon } from 'lucide-react';
 import type { ItemCheck } from '../types/receipt';
+import type { ReceiptQuantityLine } from '../api/storeApi';
 import { useOrders } from '../contexts/OrdersContext';
 import { PageContainer } from '../components/ui/PageContainer';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -13,16 +14,16 @@ import { ChilledTag } from '../components/orders/ChilledTag';
 import { OrderNotFound } from '../components/orders/OrderNotFound';
 import { ProofOfDelivery } from '../components/receipt/ProofOfDelivery';
 import { ReceiptItemRow } from '../components/receipt/ReceiptItemRow';
-import { formatTime24, formatClock } from '../utils/time';
+import { formatTime24 } from '../utils/time';
 import { relativeDay } from '../utils/format';
-import { NOW_MINUTES } from '../data/schedule';
 
-const emptyCheck = (): ItemCheck => ({ result: null, issueType: null, description: '', photos: [] });
+const emptyCheck = (): ItemCheck => ({ result: null, issueType: null, description: '', photos: [], acceptedQty: '', damagedQty: '', missingQty: '' });
 
 export function ConfirmReceipt() {
   const { orderId } = useParams();
   const navigate = useNavigate();
-  const { getOrder, updateOrder } = useOrders();
+  const { getOrder, confirmReceipt, live, loading } = useOrders();
+  const actionId = useRef<string | null>(null);
   const order = getOrder(orderId);
   const [checks, setChecks] = useState<Record<string, ItemCheck>>(() =>
   Object.fromEntries((order?.items ?? []).map((i): [string, ItemCheck] => [i.id, emptyCheck()]))
@@ -30,10 +31,14 @@ export function ConfirmReceipt() {
   const [attempted, setAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  if (!order) return <OrderNotFound />;
+  useEffect(() => {
+    if (order) setChecks(previous => Object.fromEntries(order.items.map(item => [item.id, previous[item.id] ?? emptyCheck()])));
+  }, [order?.id]);
 
-  if (order.status !== 'delivered') {
-    const confirmed = order.status === 'receipt_confirmed';
+  if (!order) return loading ? <PageContainer><p role="status">Loading order…</p></PageContainer> : <OrderNotFound />;
+
+  if (order.status !== 'delivered' || order.receiptConfirmed) {
+    const confirmed = order.status === 'receipt_confirmed' || order.receiptConfirmed;
     return (
       <PageContainer>
         <Card className="mx-auto max-w-[480px] p-8 text-center">
@@ -49,36 +54,52 @@ export function ConfirmReceipt() {
 
   }
 
-  const items = order.items;
-  const checkedCount = items.filter((i) => checks[i.id]?.result !== null).length;
+  const items = live ? order.items.filter(item => item.deliveredQty !== undefined) : order.items;
+  const checkedCount = items.filter((i) => checks[i.id]?.result === 'ok' || checks[i.id]?.result === 'issue').length;
   const flagged = items.filter((i) => checks[i.id]?.result === 'issue');
-  const incompleteIssues = flagged.filter((i) => !checks[i.id].issueType || !checks[i.id].description.trim());
+  const incompleteIssues = flagged.filter((i) => {
+    const check = checks[i.id];
+    if (!check.issueType || !check.description.trim()) return true;
+    if (!live) return false;
+    const values = [check.acceptedQty, check.damagedQty, check.missingQty].map(Number);
+    return [check.acceptedQty, check.damagedQty, check.missingQty].some(value => value === '') || values.some(value => !Number.isSafeInteger(value) || value < 0) || values.reduce((sum, value) => sum + value, 0) !== (i.deliveredQty ?? 0);
+  });
   const unchecked = items.length - checkedCount;
 
-  const setCheck = (id: string, check: ItemCheck) => setChecks((prev) => ({ ...prev, [id]: check }));
-  const markAllOk = () =>
-  setChecks((prev) =>
-  Object.fromEntries(
-    Object.entries(prev).map(([id, c]): [string, ItemCheck] => [id, c.result === null ? { ...c, result: 'ok' } : c])
-  )
-  );
+  const setCheck = (id: string, check: ItemCheck) => { actionId.current = null; setChecks((prev) => ({ ...prev, [id]: check })); };
+  const markAllOk = () => { actionId.current = null; setChecks(previous => Object.fromEntries(items.map(item => {
+    const check = previous[item.id] ?? emptyCheck();
+    return [item.id, check.result === null ? { ...check, result: 'ok' } : check];
+  }))); };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     setAttempted(true);
-    if (unchecked > 0 || incompleteIssues.length > 0) return;
+    if (unchecked > 0 || incompleteIssues.length > 0 || (live && (!order.deliveryId || items.length === 0))) return;
     setSubmitting(true);
-    window.setTimeout(() => {
-      updateOrder(order.id, {
-        status: 'receipt_confirmed',
-        events: { ...order.events, receipt_confirmed: formatClock(NOW_MINUTES) }
+    try {
+      actionId.current ??= crypto.randomUUID();
+      const receiptLines: ReceiptQuantityLine[] = items.map(item => {
+        const check = checks[item.id];
+        return {
+          orderLineId: item.id,
+          acceptedQty: check.result === 'ok' ? (item.deliveredQty ?? item.qty) : Number(check.acceptedQty),
+          damagedQty: check.result === 'ok' ? 0 : Number(check.damagedQty),
+          missingQty: check.result === 'ok' ? 0 : Number(check.missingQty),
+          note: check.result === 'issue' ? check.description.trim() : null,
+          photoRefs: [],
+        };
       });
+      await confirmReceipt(order, receiptLines, actionId.current);
+      actionId.current = null;
       toast.success('Receipt confirmed', {
         description: flagged.length ?
         `${flagged.length} flagged item${flagged.length === 1 ? '' : 's'} reported to the dispatcher.` :
         'All items received OK.'
       });
       navigate(`/orders/${order.id}`);
-    }, 700);
+    } catch (cause) {
+      toast.error('Receipt was not confirmed', { description: cause instanceof Error ? cause.message : 'Please try again.' });
+    } finally { setSubmitting(false); }
   };
 
   return (
@@ -117,7 +138,7 @@ export function ConfirmReceipt() {
           </div>
           <ul className="divide-y divide-line">
             {items.map((item) =>
-            <ReceiptItemRow key={item.id} item={item} check={checks[item.id]} showErrors={attempted} onChange={(c) => setCheck(item.id, c)} />
+            <ReceiptItemRow key={item.id} item={item} check={checks[item.id] ?? emptyCheck()} live={live} showErrors={attempted} onChange={(c) => setCheck(item.id, c)} />
             )}
           </ul>
           <div className="space-y-4 border-t border-line px-4 py-4 md:px-6 md:py-6">
@@ -131,7 +152,7 @@ export function ConfirmReceipt() {
             <p role="alert" className="text-sm font-medium text-danger-ink">
                 {unchecked > 0 ?
               `Mark ${unchecked} remaining item${unchecked === 1 ? '' : 's'} before confirming.` :
-              'Add an issue type and description for each flagged item.'}
+              live ? 'Add an issue type, description, and quantities that total the Driver handover.' : 'Add an issue type and description for each flagged item.'}
               </p>
             }
             <div className="flex md:justify-end">

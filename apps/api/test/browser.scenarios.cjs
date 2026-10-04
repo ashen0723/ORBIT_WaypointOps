@@ -24,7 +24,11 @@ module.exports = async ({ db, base }) => {
     }
     const path = req.url.split("?")[0];
     const file =
-      path.startsWith("/assets/") || path === "/sw.js" ? path : "/index.html";
+      path.startsWith("/assets/") ||
+      path === "/sw.js" ||
+      /\.(jpg|png|webp)$/.test(path)
+        ? path
+        : "/index.html";
     try {
       const data = await readFile(join(webRoot, file));
       res.setHeader(
@@ -33,7 +37,13 @@ module.exports = async ({ db, base }) => {
           ? "application/javascript"
           : file.endsWith(".css")
             ? "text/css"
-            : "text/html",
+            : file.endsWith(".jpg")
+              ? "image/jpeg"
+              : file.endsWith(".png")
+                ? "image/png"
+                : file.endsWith(".webp")
+                  ? "image/webp"
+                  : "text/html",
       );
       res.end(data);
     } catch {
@@ -69,7 +79,70 @@ module.exports = async ({ db, base }) => {
       pages[role] = page;
       page.on("pageerror", (e) => errors.push(e.message));
       await page.goto(url);
+      await expect(
+        page.getByRole("navigation", { name: "Main navigation" }),
+      ).toBeVisible();
+      await expect
+        .poll(() =>
+          page
+            .locator("img")
+            .evaluateAll((images) =>
+              images.every((i) => i.complete && i.naturalWidth > 0),
+            ),
+        )
+        .toBe(true);
+      if (role === "store") {
+        await page.screenshot({
+          path: "/private/tmp/waypoint-landing-desktop.png",
+          fullPage: true,
+        });
+        await page.setViewportSize({ width: 390, height: 844 });
+        assert.ok(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth + 1,
+          ),
+        );
+        await page.screenshot({
+          path: "/private/tmp/waypoint-landing-mobile.png",
+          fullPage: true,
+        });
+        await page.setViewportSize({ width: 1280, height: 900 });
+      }
+      await page
+        .getByRole("navigation", { name: "Main navigation" })
+        .getByRole("link", { name: "Sign in", exact: true })
+        .click();
+      await expect(
+        page.getByRole("heading", { name: "Welcome back." }),
+      ).toBeVisible();
+      await expect
+        .poll(() =>
+          page
+            .locator("img")
+            .evaluateAll((images) =>
+              images.every((i) => i.complete && i.naturalWidth > 0),
+            ),
+        )
+        .toBe(true);
       await page.getByLabel("Email", { exact: true }).fill(`${role}@test`);
+      if (role === "store") {
+        await page
+          .getByLabel("Password", { exact: true })
+          .fill("wrong-password");
+        await page
+          .getByRole("button", { name: "Sign in", exact: true })
+          .click();
+        await expect(page.getByRole("alert")).toBeVisible();
+        await page.getByRole("button", { name: "Show password" }).click();
+        await expect(
+          page.getByLabel("Password", { exact: true }),
+        ).toHaveAttribute("type", "text");
+        await page.getByRole("button", { name: "Hide password" }).click();
+        await page.screenshot({
+          path: "/private/tmp/waypoint-login-desktop.png",
+          fullPage: true,
+        });
+      }
       await page.getByLabel("Password", { exact: true }).fill("test-password");
       await page.getByRole("button", { name: "Sign in", exact: true }).click();
       await expect(
@@ -148,14 +221,12 @@ module.exports = async ({ db, base }) => {
     await loader
       .getByText("Report damaged or missing stock with photo", { exact: true })
       .click();
-    const photoForm = loader
-      .locator("form")
-      .filter({
-        has: loader.getByRole("button", {
-          name: "Report loading issue",
-          exact: true,
-        }),
-      });
+    const photoForm = loader.locator("form").filter({
+      has: loader.getByRole("button", {
+        name: "Report loading issue",
+        exact: true,
+      }),
+    });
     await photoForm.getByLabel("Issue type").selectOption("DAMAGED");
     await photoForm.getByLabel("Available quantity").fill("2");
     await photoForm
@@ -165,13 +236,11 @@ module.exports = async ({ db, base }) => {
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aR9sAAAAASUVORK5CYII=",
       "base64",
     );
-    await photoForm
-      .getByLabel("Issue photo (optional)")
-      .setInputFiles({
-        name: "damage.png",
-        mimeType: "image/png",
-        buffer: png,
-      });
+    await photoForm.getByLabel("Issue photo (optional)").setInputFiles({
+      name: "damage.png",
+      mimeType: "image/png",
+      buffer: png,
+    });
     await photoForm
       .getByRole("button", { name: "Report loading issue", exact: true })
       .click();

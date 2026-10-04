@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { PackageIcon, SnowflakeIcon } from 'lucide-react';
 import type { Brand, LineDraft, OrderType } from '../types/orders';
 import { useOrders } from '../contexts/OrdersContext';
@@ -12,7 +13,7 @@ import { CutoffBanner } from '../components/orders/CutoffBanner';
 import { FreshOrderTabs } from '../components/order-form/FreshOrderTabs';
 import { LineItemsEditor } from '../components/order-form/LineItemsEditor';
 import { OrderSummary } from '../components/order-form/OrderSummary';
-import { catalog } from '../data/catalog';
+import { nextDeliveryDateColombo } from '../api/storeApi';
 import { CUTOFF_MINUTES, NEXT_DELIVERY, OUTLET_NAME } from '../data/schedule';
 import { createBlankLine, isLineComplete, lineError } from '../utils/lineDrafts';
 import { estimateLoad } from '../utils/estimate';
@@ -33,32 +34,40 @@ const initialDrafts: Record<string, LineDraft[]> = {
 export function PlaceOrder() {
   const navigate = useNavigate();
   const cutoffSeconds = useCutoffSeconds();
-  const { orders, addOrder } = useOrders();
+  const { orders, catalog, live, loading, error, addOrder } = useOrders();
+  const actionId = useRef<string | null>(null);
   const screenInit = useScreenInit();
   const initialBrand = (['Fresh', 'Style', 'Tech'] as Brand[]).includes(screenInit.brand) ? screenInit.brand : 'Fresh';
   const initialFreshType = (['dry', 'chilled'] as OrderType[]).includes(screenInit.freshType) ? screenInit.freshType : 'dry';
   const [brand, setBrand] = useState<Brand>(initialBrand);
   const [freshType, setFreshType] = useState<OrderType>(initialFreshType);
-  const [drafts, setDrafts] = useState(initialDrafts);
+  const [drafts, setDrafts] = useState(live ? {} : initialDrafts);
   const [showErrors, setShowErrors] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (live && catalog.length > 0 && !catalog.some(item => item.brand === brand)) setBrand(catalog[0].brand);
+  }, [live, catalog, brand]);
+
+  useEffect(() => { actionId.current = null; }, [brand, freshType, drafts]);
 
   const type: OrderType = brand === 'Fresh' ? freshType : 'dry';
   const key = `${brand}-${type}`;
   const lines = drafts[key] ?? [createBlankLine()];
-  const delivery = NEXT_DELIVERY[brand];
+  const delivery = live ? { date: nextDeliveryDateColombo(), note: 'Next operating run; final date confirmed by dispatch' } : NEXT_DELIVERY[brand];
   const suggestions = catalog.filter((c) => c.brand === brand && c.type === type);
   const valid = lines.filter(isLineComplete).map((l) => ({ name: l.name.trim(), qty: Number(l.qty), unit: l.unit }));
   const hasPartial = lines.some((l) => lineError(l) !== null);
   const load = estimateLoad(valid);
   const totalQty = valid.reduce((s, l) => s + l.qty, 0);
-  const pastCutoff = cutoffSeconds === 0;
+  const pastCutoff = !live && cutoffSeconds === 0;
 
   const findSubmitted = (b: Brand, t: OrderType) =>
-  orders.find((o) => o.brand === b && o.type === t && o.requestedDate === NEXT_DELIVERY[b].date);
+  orders.find((o) => o.brand === b && o.type === t && o.requestedDate === (live ? delivery.date : NEXT_DELIVERY[b].date));
   const prior = findSubmitted(brand, type);
 
-  const helpText = pastCutoff ?
+  const helpText = live && (loading || catalog.length === 0) ? 'Loading your outlet catalogue…' :
+  live && error ? error : pastCutoff ?
   'Submission is closed — the 4:00 PM cutoff has passed. Your draft is kept; submit from 6:00 AM tomorrow for the following run.' :
   valid.length === 0 ?
   'Add at least one item with a quantity to submit.' :
@@ -68,36 +77,45 @@ export function PlaceOrder() {
 
   const setLines = (next: LineDraft[]) => setDrafts((prev) => ({ ...prev, [key]: next }));
 
-  const handleSubmit = () => {
-    if (pastCutoff || submitting) return;
+  const handleSubmit = async () => {
+    if (pastCutoff || submitting || (live && (loading || catalog.length === 0))) return;
     if (valid.length === 0 || hasPartial) {
       setShowErrors(true);
       return;
     }
+    if (live && valid.some(line => !suggestions.some(product => product.name === line.name && product.unit === line.unit) || !Number.isSafeInteger(line.qty))) {
+      setShowErrors(true);
+      toast.error('Choose catalogue items with whole-number quantities.');
+      return;
+    }
     setSubmitting(true);
-    window.setTimeout(() => {
-      const nowLabel = formatClock(CUTOFF_MINUTES - Math.ceil(cutoffSeconds / 60));
-      const order = addOrder({
+    try {
+      actionId.current ??= crypto.randomUUID();
+      const nowLabel = live ? new Date().toLocaleTimeString('en-LK', { timeZone: 'Asia/Colombo', hour: '2-digit', minute: '2-digit' }) : formatClock(CUTOFF_MINUTES - Math.ceil(cutoffSeconds / 60));
+      const order = await addOrder({
         brand,
         type,
         requestedDate: delivery.date,
         submittedAt: `Today, ${nowLabel}`,
         items: valid.map((l, i) => ({ id: `n${i}`, ...l }))
-      });
+      }, actionId.current);
+      actionId.current = null;
       setDrafts((prev) => ({ ...prev, [key]: [createBlankLine(suggestions[0]?.unit)] }));
       navigate(`/orders/${order.id}/confirmation`);
-    }, 700);
+    } catch (cause) {
+      toast.error('Order was not submitted', { description: cause instanceof Error ? cause.message : 'Please try again.' });
+    } finally { setSubmitting(false); }
   };
 
   const countDrafted = (t: OrderType) => (drafts[`Fresh-${t}`] ?? []).filter(isLineComplete).length;
 
   return (
     <PageContainer>
-      <PageHeader title="Place Order" subtitle={`${OUTLET_NAME} · orders for the next delivery run`} />
-      <CutoffBanner seconds={cutoffSeconds} />
+      <PageHeader title="Place Order" subtitle={`${live ? 'Your outlet' : OUTLET_NAME} · orders for the next delivery run`} />
+      {live ? <p className="rounded-lg bg-canvas px-4 py-3 text-sm text-subtle">Orders after 4:00 PM Colombo time move to the following operating run.</p> : <CutoffBanner seconds={cutoffSeconds} />}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
-        <fieldset disabled={pastCutoff} className="min-w-0 space-y-6">
+        <fieldset disabled={pastCutoff || (live && loading)} className="min-w-0 space-y-6">
           <legend className="sr-only">Order details</legend>
           <Card className="p-4 md:p-6">
             <div className="grid gap-6 md:grid-cols-2">
@@ -112,7 +130,7 @@ export function PlaceOrder() {
                       setShowErrors(false);
                     }}
                     selectedClassName="bg-forest text-white shadow-card hover:bg-brand"
-                    options={(['Fresh', 'Style', 'Tech'] as Brand[]).map((b) => ({
+                    options={(live ? [...new Set(catalog.map(item => item.brand))] : ['Fresh', 'Style', 'Tech'] as Brand[]).map((b) => ({
                       value: b,
                       label: b
                     }))} />
@@ -193,7 +211,7 @@ export function PlaceOrder() {
           deliveryNote={delivery.note}
           priorOrderId={prior?.id}
           helpText={helpText}
-          pastCutoff={pastCutoff}
+          pastCutoff={pastCutoff || (live && (loading || catalog.length === 0))}
           submitting={submitting}
           onSubmit={handleSubmit} />
         

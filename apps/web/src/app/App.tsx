@@ -10,9 +10,10 @@ import { LiveDriverApp } from '../features/driver/LiveDriverApp';
 
 const ROLE_MODULES: RoleModules = { dispatcher: DispatcherApp, store_manager: OperationsApp, loader: LoaderApp, driver: LiveDriverApp };
 
-const LOGIN_TREE = (
+const PUBLIC_TREE = (
   <BrowserRouter>
     <Routes>
+      <Route path="/" element={<Landing />} />
       <Route path={LOGIN_PATH} element={<Login />} />
       <Route path="*" element={<Navigate to={LOGIN_PATH} replace />} />
     </Routes>
@@ -21,7 +22,15 @@ const LOGIN_TREE = (
 
 function SessionRoleRouter() {
   const { user } = useAuth();
-  return <RoleRouter role={user?.role ?? null} userId={user?.id ?? null} modules={ROLE_MODULES} login={LOGIN_TREE} />;
+  return (
+    <RoleRouter
+      role={user?.role ?? null}
+      userId={user?.id ?? null}
+      modules={ROLE_MODULES}
+      login={PUBLIC_TREE}
+      landing={PUBLIC_TREE}
+    />
+  );
 }
 
 export function App() {

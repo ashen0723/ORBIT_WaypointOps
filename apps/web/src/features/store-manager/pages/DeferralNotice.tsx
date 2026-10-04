@@ -34,7 +34,7 @@ const FORMS: Record<RequestMode, {title: string;description: string;reasons: str
 
 export function DeferralNotice() {
   const { orderId } = useParams();
-  const { getOrder } = useOrders();
+  const { getOrder, loading, live } = useOrders();
   const order = getOrder(orderId);
   const [mode, setMode] = useState<RequestMode | null>(null);
   const [reason, setReason] = useState('');
@@ -43,7 +43,7 @@ export function DeferralNotice() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState<{mode: RequestMode;reason: string;}[]>([]);
 
-  if (!order || !order.deferral) return <OrderNotFound />;
+  if (!order || !order.deferral) return loading ? <PageContainer><p role="status">Loading order…</p></PageContainer> : <OrderNotFound />;
   const deferral = order.deferral;
   const form = mode ? FORMS[mode] : null;
 
@@ -107,7 +107,7 @@ export function DeferralNotice() {
               <div>
                 <p className="text-xs text-subtle">New expected date</p>
                 <p className="mt-1 text-lg font-semibold text-ink">{formatDateLong(deferral.newDate)}</p>
-                <p className="text-sm text-subtle">{NEXT_DELIVERY[order.brand].note}</p>
+                {!live && <p className="text-sm text-subtle">{NEXT_DELIVERY[order.brand].note}</p>}
               </div>
             </div>
 
@@ -140,14 +140,14 @@ export function DeferralNotice() {
               </ul>
             }
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            {live ? <p className="text-sm text-subtle">Contact dispatch through your team’s agreed channel for priority changes.</p> : <div className="grid gap-3 sm:grid-cols-2">
               <Button variant="outline" size="lg" fullWidth onClick={() => openForm('priority')}>
                 Request Priority
               </Button>
               <Button variant="outline" size="lg" fullWidth onClick={() => openForm('urgency')}>
                 Report Urgency
               </Button>
-            </div>
+            </div>}
           </div>
         </Card>
       </div>

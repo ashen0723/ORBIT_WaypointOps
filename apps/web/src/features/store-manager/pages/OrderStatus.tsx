@@ -21,16 +21,16 @@ import { totalQuantity } from '../utils/orders';
 
 export function OrderStatus() {
   const { orderId } = useParams();
-  const { getOrder } = useOrders();
+  const { getOrder, loading, live } = useOrders();
   const [contactOpen, setContactOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [messageError, setMessageError] = useState(false);
   const order = getOrder(orderId);
 
-  if (!order) return <OrderNotFound />;
+  if (!order) return loading ? <PageContainer><p role="status">Loading order…</p></PageContainer> : <OrderNotFound />;
 
   const primary =
-  order.status === 'delivered' ?
+  order.status === 'delivered' && !order.receiptConfirmed ?
   { label: 'Confirm Receipt', to: `/orders/${order.id}/receipt` } :
   order.status === 'deferred' ?
   { label: 'View Deferral Notice', to: `/orders/${order.id}/deferral` } :
@@ -53,7 +53,7 @@ export function OrderStatus() {
   { term: 'Delivery type', value: order.type === 'chilled' ? 'Chilled' : 'Dry' },
   { term: 'Requested date', value: formatDate(order.requestedDate) },
   { term: 'Submitted', value: order.submittedAt },
-  { term: 'Dispatcher', value: DISPATCHER.name }];
+  { term: 'Dispatcher', value: live ? 'Dispatch team' : DISPATCHER.name }];
 
 
   return (
@@ -70,10 +70,10 @@ export function OrderStatus() {
         }
         actions={
         <>
-            <Button variant="secondary" size="lg" onClick={() => setContactOpen(true)} className="flex-1 md:flex-none">
+            {!live && <Button variant="secondary" size="lg" onClick={() => setContactOpen(true)} className="flex-1 md:flex-none">
               <HeadsetIcon aria-hidden="true" className="h-4 w-4" />
               Contact Dispatcher
-            </Button>
+            </Button>}
             {primary &&
           <Link to={primary.to} className={`${buttonStyles('primary', 'lg')} flex-1 md:flex-none`}>
                 {primary.label}
@@ -113,7 +113,7 @@ export function OrderStatus() {
         </div>
 
         <div className="space-y-6">
-          <RouteMap order={order} />
+          {live ? <Card className="p-4 md:p-6"><h2 className="text-base font-semibold text-ink">Route tracking</h2><p className="mt-2 text-sm text-subtle">Vehicle location is not available yet.</p></Card> : <RouteMap order={order} />}
           <Card className="p-4 md:p-6">
             <h2 className="text-base font-semibold text-ink">Order details</h2>
             <dl className="mt-4 space-y-3 text-sm">

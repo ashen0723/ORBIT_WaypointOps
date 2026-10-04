@@ -1,16 +1,17 @@
 # Remaining PR integration order
 
-Reviewed with main `92c740b`: #2, #4, #8, #5, #6, #10, #9, #13 and #11 are merged.
-No remote PRs were merged or closed during this review.
+Reviewed with main `eeed3ff`: #12 Loader and #7 Driver presentation are now merged.
+The open PRs are #3 and #14; no remote merges were performed by this task.
 
 | Order | PR / branch | Required work before merge |
 |---|---|---|
-| 1 | #12 `loader` | Prepared locally: one guarded loading implementation and dedicated live Loader entry point, with current versions, photos and readiness checks. |
-| 2 | #7 `vihandu` | Connect Driver UI to canonical contracts and durable outbox before replacing the mounted Driver flow. |
-| 3 | #3 `mansi` | Separate unique landing/login/Store UI from duplicated auth/schema/importer/backend changes. |
-| 4 | #14 `feature/docker-deploy` | Newly open deployment PR: review against the final integrated tree and validate actual container startup, migrations and web/API connectivity. |
+| 1 | #3 `mansi` | Prepared locally: landing and live login with current schema/auth/workflow preserved; source-reference Store UI remains unmounted. |
+| 2 | #14 `feature/docker-deploy` | Review against the integrated tree; validate container startup, migration deployment and browser/API connectivity. |
 
-Main already contains #9's duplicate Fleet `/vehicles` route and unguarded detail handler. Its merge status does not establish contract/security reconciliation; schedule a follow-up to unify these with the guarded paginated workflow fleet projection.
+Follow-ups outside the remaining PR sequence: #9 still has duplicate fleet route ownership
+and an unguarded vehicle detail endpoint. #7's prototype needs a verified backend/outbox
+adapter before replacing the mounted Driver OperationsApp. Interrupted adapter edits are
+preserved as described in `landing-login-integration.md`.
 
 This is a proposed integration sequence, not permission to bulk-merge. Refresh each branch against
 main after the previous merge and inspect its new diff. Backend contract reconciliation is required
@@ -54,3 +55,11 @@ refreshed issue version, checked replacement/acknowledgement, completed loads, m
 and the complete delivery/receipt/offline replay lifecycle. Original prototype sources remain
 design references; the mounted app uses the documented shared-contract implementation.
 See `loader-integration.md`. No commit, push or remote merge was performed.
+
+## #3 verification
+
+Reconciled with main `eeed3ff`. Passed 233 unit/HTTP tests (153 API, 80 web), live app,
+contract and Prisma type checks, both production builds, isolated PostgreSQL/Chromium
+four-role workflows and fresh migration/seed/importer replay. Public-page browser checks
+include loaded image assets, mobile overflow, invalid credentials and password visibility.
+Changes are prepared on `mansi`; no commit, push or remote merge was performed for #3.

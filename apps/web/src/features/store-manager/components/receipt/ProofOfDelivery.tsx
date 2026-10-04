@@ -3,12 +3,25 @@ import type { Order } from '../../types/orders';
 import { Card } from '../ui/Card';
 import { formatTime24 } from '../../utils/time';
 import { relativeDay } from '../../utils/format';
+import { useOrders } from '../../contexts/OrdersContext';
 
 const POD_PHOTO = "/20f5b2f1-6439-49ff-a85e-ff8d80491cd8.jpg";
 
 export function ProofOfDelivery({ order }: {order: Order;}) {
+  const { live } = useOrders();
   const time = order.deliveredAt ? formatTime24(order.deliveredAt) : '—';
   const driver = order.vehicle?.driver ?? 'Driver';
+
+  if (live) return (
+    <Card className="p-4 md:p-6 lg:sticky lg:top-24">
+      <h2 className="text-base font-semibold text-ink">Driver’s proof of delivery</h2>
+      <p className="mt-3 text-sm text-subtle">Delivered at {time}. Check the quantities recorded by the driver against what arrived.</p>
+      {order.pod?.receivedBy && <p className="mt-3 text-sm text-ink">Recipient: {order.pod.receivedBy}</p>}
+      {(order.pod?.photoRef || order.pod?.signatureRef) ?
+        <p className="mt-3 text-sm text-subtle">Proof was recorded by the driver. File previews will be available when attachment access is connected.</p> :
+        <p className="mt-3 text-sm text-subtle">No photo or signature was attached to this delivery.</p>}
+    </Card>
+  );
 
   return (
     <Card className="p-4 md:p-6 lg:sticky lg:top-24">
