@@ -1,4 +1,4 @@
-import React, { FormEvent, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { ArrowRightIcon, Loader2Icon, PackageCheckIcon, RouteIcon, StoreIcon, TruckIcon } from 'lucide-react';
 import { Logo } from '../components/layout/Logo';

@@ -1,2 +1,2 @@
-/** One shared JWT auth/session provider for every role. Mock business sessions remain isolated inside it. */
+/** Real API authentication; sessions are isolated per browser tab. */
 export { SessionProvider as AuthProvider, useSession as useAuth } from '../../features/dispatcher/contexts/SessionContext';
