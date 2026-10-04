@@ -1,13 +1,13 @@
-import { Controller, Get, Param } from '@nestjs/common';
-import { UsersService } from './users.service';
-
-@Controller('users')
+import { Controller, Get, Param, Req, UseGuards } from "@nestjs/common";
+import { AuthGuard, Roles, type AuthRequest } from "../auth/auth.guard";
+import { UsersService } from "./users.service";
+@Controller("users")
+@UseGuards(AuthGuard)
+@Roles("DRIVER")
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
-
-  // GET /users/driver/:userId/profile
-  @Get('driver/:userId/profile')
-  getDriverProfile(@Param('userId') userId: string) {
-    return this.usersService.getDriverProfile(userId);
+  constructor(private readonly users: UsersService) {}
+  @Get("driver/:userId/profile")
+  profile(@Req() r: AuthRequest, @Param("userId") id: string) {
+    return this.users.getDriverProfile(r.user, id);
   }
 }

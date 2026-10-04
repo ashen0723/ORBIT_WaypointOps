@@ -1,10 +1,9 @@
-import { Module } from '@nestjs/common';
-import { DeliveryController } from './delivery.controller';
-import { DeliveryService } from './delivery.service';
-
+import { Module } from "@nestjs/common";
+import { AuthModule } from "../auth/auth.module";
+import { WorkflowModule } from "../workflow/workflow.module";
+import { DeliveryController } from "./delivery.controller";
 @Module({
+  imports: [AuthModule, WorkflowModule],
   controllers: [DeliveryController],
-  providers: [DeliveryService],
-  exports: [DeliveryService],
 })
 export class DeliveryModule {}

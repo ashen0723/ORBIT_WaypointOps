@@ -1,35 +1,27 @@
-import { Controller, Get, Param } from '@nestjs/common';
-import { TripsService } from './trips.service';
-
-@Controller('trips')
+import { Controller, Get, Param, Query, Req, UseGuards } from "@nestjs/common";
+import { AuthGuard, Roles, type AuthRequest } from "../auth/auth.guard";
+import { TripsService } from "./trips.service";
+@Controller("trips")
+@UseGuards(AuthGuard)
 export class TripsController {
-  constructor(private readonly tripsService: TripsService) {}
-
-  // Driver Today page
-  // GET /trips/driver/:userId/today
-  @Get('driver/:userId/today')
-  getDriverToday(@Param('userId') userId: string) {
-    return this.tripsService.getDriverToday(userId);
+  constructor(private readonly trips: TripsService) {}
+  @Get("driver/:userId/today")
+  @Roles("DRIVER")
+  today(
+    @Req() r: AuthRequest,
+    @Param("userId") id: string,
+    @Query() q: Record<string, unknown>,
+  ) {
+    return this.trips.today(r.user, id, q);
   }
-
-  // Store delivery projection
-  // GET /trips/order/:orderId/delivery
-  @Get('order/:orderId/delivery')
-  getOrderDelivery(@Param('orderId') orderId: string) {
-    return this.tripsService.getOrderDelivery(orderId);
+  @Get("order/:orderId/delivery")
+  @Roles("STORE_MANAGER", "DISPATCHER", "DRIVER")
+  delivery(@Req() r: AuthRequest, @Param("orderId") id: string) {
+    return this.trips.orderDelivery(r.user, id);
   }
-
-  // Dispatcher delivery progress
-  // GET /trips/:tripId/delivery-progress
-  @Get(':tripId/delivery-progress')
-  getDeliveryProgress(@Param('tripId') tripId: string) {
-    return this.tripsService.getDeliveryProgress(tripId);
-  }
-
-  // Get one trip with all stops
-  // GET /trips/:tripId
-  @Get(':tripId')
-  getTripById(@Param('tripId') tripId: string) {
-    return this.tripsService.getTripById(tripId);
+  @Get(":tripId/delivery-progress")
+  @Roles("DISPATCHER")
+  progress(@Req() r: AuthRequest, @Param("tripId") id: string) {
+    return this.trips.progress(r.user, id);
   }
 }

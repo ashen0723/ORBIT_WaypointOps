@@ -1,11 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
 
+import type { Actor } from "../auth/auth.service";
+import { fail } from "../common/api-error";
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getDriverProfile(userId: string) {
+  async getDriverProfile(actor: Actor, userId: string) {
+    if (actor.role !== "DRIVER" || actor.id !== userId)
+      fail(403, "FORBIDDEN", "Drivers can read only their own profile.");
     const driver = await this.prisma.user.findUnique({
       where: {
         id: userId,
@@ -20,8 +24,8 @@ export class UsersService {
       },
     });
 
-    if (!driver || driver.role !== 'DRIVER') {
-      throw new NotFoundException('Driver not found');
+    if (!driver || !driver.active || driver.role !== "DRIVER") {
+      throw new NotFoundException("Driver not found");
     }
 
     return {
@@ -58,5 +62,11 @@ export class UsersService {
             }
           : null,
     };
+  }
+  findByEmail(email: string) {
+    return this.prisma.user.findUnique({ where: { email } });
+  }
+  findById(id: string) {
+    return this.prisma.user.findUnique({ where: { id } });
   }
 }

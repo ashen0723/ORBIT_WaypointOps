@@ -2,103 +2,73 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Param,
-  Patch,
   Post,
-} from '@nestjs/common';
-import { DeliveryService } from './delivery.service';
-
-@Controller('delivery')
+  Req,
+  UseGuards,
+} from "@nestjs/common";
+import { AuthGuard, Roles, type AuthRequest } from "../auth/auth.guard";
+import { fail } from "../common/api-error";
+import { FieldService } from "../workflow/field.service";
+@Controller()
+@UseGuards(AuthGuard)
 export class DeliveryController {
-  constructor(
-    private readonly deliveryService: DeliveryService,
-  ) {}
-
-  // GET /delivery/stop/:stopId
-  @Get('stop/:stopId')
-  getDeliveryByStop(
-    @Param('stopId') stopId: string,
+  constructor(private readonly field: FieldService) {}
+  @Post("trips/:id/depart") @HttpCode(200) @Roles("DRIVER") depart(
+    @Req() r: AuthRequest,
+    @Param("id") id: string,
+    @Body() b: unknown,
   ) {
-    return this.deliveryService.getDeliveryByStop(
-      stopId,
-    );
+    return this.field.depart(r.user, id, b);
   }
-
-  // PATCH /delivery/stop/:stopId/arrive
-  @Patch('stop/:stopId/arrive')
-  markArrived(
-    @Param('stopId') stopId: string,
+  @Post("stops/:id/arrive") @HttpCode(200) @Roles("DRIVER") arrive(
+    @Req() r: AuthRequest,
+    @Param("id") id: string,
+    @Body() b: unknown,
   ) {
-    return this.deliveryService.markArrived(
-      stopId,
-    );
+    return this.field.direct(r.user, "ARRIVE", id, b);
   }
-
-  // POST /delivery/stop/:stopId/complete
-  @Post('stop/:stopId/complete')
-  recordDelivery(
-    @Param('stopId') stopId: string,
-
-    @Body()
-    body: {
-      outcome:
-        | 'DELIVERED'
-        | 'PARTIAL'
-        | 'FAILED';
-
-      reason?: string;
-
-      recipientName?: string;
-      signatureRef?: string;
-      photoRef?: string;
-
-      clientActionId?: string;
-
-      items?: {
-        lineId: string;
-        deliveredQty: number;
-      }[];
-    },
+  @Post("stops/:id/outcome") @Roles("DRIVER") outcome(
+    @Req() r: AuthRequest,
+    @Param("id") id: string,
+    @Body() b: unknown,
   ) {
-    return this.deliveryService.recordDelivery(
-      stopId,
-      body,
-    );
+    return this.field.direct(r.user, "OUTCOME", id, b);
   }
-
-  // POST /delivery/driver/:userId/issues
-  @Post('driver/:userId/issues')
-  reportIssue(
-    @Param('userId') userId: string,
-
-    @Body()
-    body: {
-      stopId?: string;
-      tripId?: string;
-
-      issueType:
-        | 'BREAKDOWN'
-        | 'DELAY'
-        | 'ROAD'
-        | 'OUTLET'
-        | 'OTHER';
-
-      message: string;
-    },
+  @Get("deliveries/:id") delivery(
+    @Req() r: AuthRequest,
+    @Param("id") id: string,
   ) {
-    return this.deliveryService.reportIssue(
-      userId,
-      body,
-    );
+    return this.field.getDelivery(r.user, id);
   }
-
-  // POST /delivery/trip/:tripId/complete
-  @Post('trip/:tripId/complete')
-  completeTrip(
-    @Param('tripId') tripId: string,
+  @Post("deliveries/:id/review") @HttpCode(200) @Roles("DISPATCHER") review(
+    @Req() r: AuthRequest,
+    @Param("id") id: string,
+    @Body() b: unknown,
   ) {
-    return this.deliveryService.completeTrip(
-      tripId,
-    );
+    return this.field.review(r.user, id, b);
+  }
+  @Post("driver/issues") @Roles("DRIVER") async reportIssue(
+    @Req() r: AuthRequest,
+    @Body() b: unknown,
+  ) {
+    const result = await this.field.issue(r.user, b);
+    if (result.status === "CONFLICT")
+      fail(409, "STALE_PLAN", "Incident preserved for Dispatcher review.", [
+        {
+          code: "STALE_PLAN",
+          message: "Recorded incident needs reconciliation.",
+          field: "expectedPlanVersion",
+          entityId: result.conflictId,
+        },
+      ]);
+    return result.value;
+  }
+  @Get("trips/:id/issues") @Roles("DRIVER", "DISPATCHER") issues(
+    @Req() r: AuthRequest,
+    @Param("id") id: string,
+  ) {
+    return this.field.issues(r.user, id);
   }
 }
