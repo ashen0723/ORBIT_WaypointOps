@@ -95,6 +95,9 @@ export function LoadingQueue() {
 
   const {
     queueLoads,
+    queueLoading,
+    queueError,
+    refreshQueue,
     reviewedPlanVehicleIds,
     handedOffVehicleIds,
   } = useLoader();
@@ -347,6 +350,28 @@ export function LoadingQueue() {
         }
       />
 
+      {queueLoading && queueLoads.length === 0 && (
+        <Card className="mt-7 flex items-center gap-3 p-5 text-sm text-subtle">
+          <RefreshCwIcon aria-hidden="true" className="h-5 w-5 animate-spin text-forest" />
+          Loading published trips…
+        </Card>
+      )}
+
+      {queueError && queueLoads.length === 0 && (
+        <Card className="mt-7 border-red-200 bg-red-50 p-5">
+          <p className="font-semibold text-red-900">Could not load the loading queue</p>
+          <p className="mt-1 text-sm text-red-800">{queueError}</p>
+          <button
+            type="button"
+            onClick={() => void refreshQueue()}
+            className={`${buttonStyles('secondary', 'md')} mt-4`}
+          >
+            <RefreshCwIcon aria-hidden="true" className="h-4 w-4" />
+            Try again
+          </button>
+        </Card>
+      )}
+
       <section
         aria-label="Queue overview"
         className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
@@ -513,7 +538,7 @@ export function LoadingQueue() {
         )}
 
       {loads.length ===
-        0 && (
+        0 && !queueLoading && !queueError && (
           <Card className="mt-7 p-8 text-center">
             <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-brand-pale text-forest">
               <TruckIcon

@@ -1,6 +1,8 @@
 import {
+  useCallback,
   createContext,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
@@ -14,6 +16,8 @@ import type {
   LoaderIssueTarget,
   LoaderIssueType,
 } from '../types/loader';
+import { useAuth } from '../../../app/providers/AuthProvider';
+import { fetchLoaderTrips } from '../api/loaderApi';
 
 export interface LoaderTripView {
   tripId: string;
@@ -30,6 +34,9 @@ interface LoaderContextValue {
    * populate it later through hydrateLoaderData().
    */
   queueLoads: LoadQueueItem[];
+  queueLoading: boolean;
+  queueError: string | null;
+  refreshQueue: () => Promise<void>;
 
   tripDataById: Record<string, LoaderTripView>;
 
@@ -109,10 +116,15 @@ export function LoaderProvider({
 }: {
   children: ReactNode;
 }) {
+  const { token, user } = useAuth();
+
   const [
     queueLoads,
     setQueueLoads,
   ] = useState<LoadQueueItem[]>([]);
+
+  const [queueLoading, setQueueLoading] = useState(false);
+  const [queueError, setQueueError] = useState<string | null>(null);
 
   const [
     tripDataById,
@@ -150,10 +162,37 @@ export function LoaderProvider({
     setHandedOffVehicleIds,
   ] = useState<string[]>([]);
 
+  const refreshQueue = useCallback(async () => {
+    if (!token || user?.role !== 'loader') {
+      setQueueLoads([]);
+      setQueueError(null);
+      setQueueLoading(false);
+      return;
+    }
+
+    setQueueLoading(true);
+    setQueueError(null);
+
+    try {
+      setQueueLoads(await fetchLoaderTrips(token));
+    } catch (error) {
+      setQueueError(error instanceof Error ? error.message : 'Could not load the loading queue.');
+    } finally {
+      setQueueLoading(false);
+    }
+  }, [token, user?.role]);
+
+  useEffect(() => {
+    void refreshQueue();
+  }, [refreshQueue]);
+
   const value =
     useMemo<LoaderContextValue>(
       () => ({
         queueLoads,
+        queueLoading,
+        queueError,
+        refreshQueue,
         tripDataById,
         quantities,
         confirmedItemIds,
@@ -580,6 +619,9 @@ export function LoaderProvider({
         issues,
         quantities,
         queueLoads,
+        queueLoading,
+        queueError,
+        refreshQueue,
         reviewedPlanVehicleIds,
         tripDataById,
       ],
