@@ -92,7 +92,7 @@ describe('LoadingService', () => {
         issues: [{
           id: 'ISSUE-1', orderLineId: 'LINE-1', type: 'MISSING', expectedQty: 20,
           availableQty: 16, note: 'Four unavailable', evidenceRef: null,
-          decision: null, status: 'OPEN',
+          decision: null, status: 'OPEN', acknowledgedById: null, acknowledgedAt: null,
           createdAt: new Date('2026-10-05T04:40:00.000Z'),
           updatedAt: new Date('2026-10-05T04:40:00.000Z'),
         }],
@@ -405,5 +405,81 @@ describe('LoadingService', () => {
     await expect(issueService.reportIssue('TRIP-1', {
       orderLineId: 'LINE-1', type: 'MISSING', availableQty: 15,
     }, { id: 'USR-LDR', depotId: 'DEP-PLG' })).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('persists acknowledgement of a Dispatcher decision', async () => {
+    const findUnique = jest.fn().mockResolvedValue({
+      id: 'ISSUE-1', status: 'SHIP_SHORT', decision: 'Ship the 16 available cases',
+      acknowledgedById: null, acknowledgedAt: null,
+      loadingRecord: {
+        tripId: 'TRIP-1', trip: { id: 'TRIP-1', depotId: 'DEP-PLG' },
+      },
+    });
+    const updateIssue = jest.fn().mockImplementation(({ data }) => Promise.resolve({
+      id: 'ISSUE-1', status: 'SHIP_SHORT', decision: 'Ship the 16 available cases',
+      acknowledgedById: data.acknowledgedById, acknowledgedAt: data.acknowledgedAt,
+    }));
+    const createAudit = jest.fn().mockResolvedValue({});
+    const transaction = jest.fn(async (callback) => callback({
+      loadingIssue: { update: updateIssue },
+      auditEvent: { create: createAudit },
+    }));
+    const acknowledgementService = new LoadingService({
+      loadingIssue: { findUnique }, $transaction: transaction,
+    } as unknown as PrismaService);
+
+    await expect(acknowledgementService.acknowledgeIssue('ISSUE-1', {
+      id: 'USR-LDR', depotId: 'DEP-PLG',
+    })).resolves.toMatchObject({
+      issueId: 'ISSUE-1', tripId: 'TRIP-1', status: 'SHIP_SHORT',
+      acknowledgedById: 'USR-LDR', alreadyAcknowledged: false,
+    });
+
+    expect(updateIssue).toHaveBeenCalledWith({
+      where: { id: 'ISSUE-1' },
+      data: { acknowledgedById: 'USR-LDR', acknowledgedAt: expect.any(Date) },
+    });
+    expect(createAudit).toHaveBeenCalledWith({
+      data: expect.objectContaining({ action: 'DISPATCHER_DECISION_ACKNOWLEDGED' }),
+    });
+  });
+
+  it('returns an existing acknowledgement without writing again', async () => {
+    const acknowledgedAt = new Date('2026-10-05T05:00:00.000Z');
+    const findUnique = jest.fn().mockResolvedValue({
+      id: 'ISSUE-1', status: 'SHIP_SHORT', decision: 'Ship short',
+      acknowledgedById: 'USR-LDR', acknowledgedAt,
+      loadingRecord: {
+        tripId: 'TRIP-1', trip: { id: 'TRIP-1', depotId: 'DEP-PLG' },
+      },
+    });
+    const transaction = jest.fn();
+    const acknowledgementService = new LoadingService({
+      loadingIssue: { findUnique }, $transaction: transaction,
+    } as unknown as PrismaService);
+
+    await expect(acknowledgementService.acknowledgeIssue('ISSUE-1', {
+      id: 'USR-LDR', depotId: 'DEP-PLG',
+    })).resolves.toMatchObject({
+      acknowledgedAt: acknowledgedAt.toISOString(), alreadyAcknowledged: true,
+    });
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects acknowledgement while the issue is still open', async () => {
+    const findUnique = jest.fn().mockResolvedValue({
+      id: 'ISSUE-1', status: 'OPEN', decision: null,
+      acknowledgedById: null, acknowledgedAt: null,
+      loadingRecord: {
+        tripId: 'TRIP-1', trip: { id: 'TRIP-1', depotId: 'DEP-PLG' },
+      },
+    });
+    const acknowledgementService = new LoadingService({
+      loadingIssue: { findUnique },
+    } as unknown as PrismaService);
+
+    await expect(acknowledgementService.acknowledgeIssue('ISSUE-1', {
+      id: 'USR-LDR', depotId: 'DEP-PLG',
+    })).rejects.toMatchObject({ status: 409 });
   });
 });

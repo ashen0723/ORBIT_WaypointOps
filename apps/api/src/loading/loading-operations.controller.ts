@@ -1,6 +1,7 @@
 import { Body, Controller, Param, Patch, Post, Req } from '@nestjs/common';
 import { LoadingService } from './loading.service';
 import type {
+  AcknowledgeLoadingIssueResult,
   CreateLoadingIssueBody,
   LoadedQuantityResult,
   LoadingIssueResult,
@@ -40,5 +41,14 @@ export class LoadingOperationsController {
   ): Promise<LoadingIssueResult> {
     const loader = requireLoader(request);
     return this.loadingService.reportIssue(tripId, body, loader);
+  }
+
+  @Post('issues/:issueId/acknowledge')
+  acknowledgeIssue(
+    @Param('issueId') issueId: string,
+    @Req() request: AuthenticatedLoaderRequest,
+  ): Promise<AcknowledgeLoadingIssueResult> {
+    const loader = requireLoader(request);
+    return this.loadingService.acknowledgeIssue(issueId, loader);
   }
 }

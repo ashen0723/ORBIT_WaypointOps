@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
+  AcknowledgeLoadingIssueResult,
   LoaderQueueStatus,
   CreateLoadingIssueBody,
   LoadedQuantityResult,
@@ -185,6 +186,8 @@ export class LoadingService {
         evidenceRef: issue.evidenceRef,
         decision: issue.decision,
         status: issue.status,
+        acknowledgedById: issue.acknowledgedById,
+        acknowledgedAt: issue.acknowledgedAt?.toISOString() ?? null,
         createdAt: issue.createdAt.toISOString(),
         updatedAt: issue.updatedAt.toISOString(),
       })),
@@ -477,6 +480,76 @@ export class LoadingService {
         status: issue.status,
         decision: issue.decision,
         createdAt: issue.createdAt.toISOString(),
+      };
+    });
+  }
+
+  async acknowledgeIssue(
+    issueId: string,
+    loader: { id: string; depotId: string },
+  ): Promise<AcknowledgeLoadingIssueResult> {
+    const issue = await this.prisma.loadingIssue.findUnique({
+      where: { id: issueId },
+      include: {
+        loadingRecord: {
+          include: { trip: true },
+        },
+      },
+    });
+
+    if (!issue || issue.loadingRecord.trip.depotId !== loader.depotId) {
+      throw new NotFoundException('Loading issue not found for this Loader depot.');
+    }
+
+    if (issue.status === 'OPEN' || !issue.decision?.trim()) {
+      throw new ConflictException('The Dispatcher must decide this issue before it can be acknowledged.');
+    }
+
+    if (issue.acknowledgedAt) {
+      return {
+        issueId: issue.id,
+        tripId: issue.loadingRecord.tripId,
+        status: issue.status,
+        decision: issue.decision,
+        acknowledgedById: issue.acknowledgedById,
+        acknowledgedAt: issue.acknowledgedAt.toISOString(),
+        alreadyAcknowledged: true,
+      };
+    }
+
+    const acknowledgedAt = new Date();
+
+    return this.prisma.$transaction(async (transaction) => {
+      const acknowledged = await transaction.loadingIssue.update({
+        where: { id: issueId },
+        data: {
+          acknowledgedById: loader.id,
+          acknowledgedAt,
+        },
+      });
+
+      await transaction.auditEvent.create({
+        data: {
+          actorId: loader.id,
+          entityType: 'LoadingIssue',
+          entityId: issueId,
+          action: 'DISPATCHER_DECISION_ACKNOWLEDGED',
+          payload: {
+            tripId: issue.loadingRecord.tripId,
+            status: issue.status,
+            decision: issue.decision,
+          },
+        },
+      });
+
+      return {
+        issueId: acknowledged.id,
+        tripId: issue.loadingRecord.tripId,
+        status: acknowledged.status,
+        decision: acknowledged.decision,
+        acknowledgedById: acknowledged.acknowledgedById,
+        acknowledgedAt: acknowledged.acknowledgedAt!.toISOString(),
+        alreadyAcknowledged: false,
       };
     });
   }

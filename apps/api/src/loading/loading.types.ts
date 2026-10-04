@@ -96,6 +96,8 @@ export interface LoaderTripDetail {
     evidenceRef: string | null;
     decision: string | null;
     status: string;
+    acknowledgedById: string | null;
+    acknowledgedAt: string | null;
     createdAt: string;
     updatedAt: string;
   }>;
@@ -145,4 +147,14 @@ export interface LoadingIssueResult {
   status: string;
   decision: string | null;
   createdAt: string;
+}
+
+export interface AcknowledgeLoadingIssueResult {
+  issueId: string;
+  tripId: string;
+  status: string;
+  decision: string | null;
+  acknowledgedById: string | null;
+  acknowledgedAt: string;
+  alreadyAcknowledged: boolean;
 }

@@ -306,6 +306,8 @@ model LoadingIssue {
   evidenceRef     String?
   decision        String? // dispatcher decision text
   status          LoadingIssueStatus @default(OPEN)
+  acknowledgedById String?
+  acknowledgedAt   DateTime?
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 

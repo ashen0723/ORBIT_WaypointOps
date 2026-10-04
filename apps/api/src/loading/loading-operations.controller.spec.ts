@@ -5,16 +5,19 @@ describe('LoadingOperationsController', () => {
   const startLoading = jest.fn();
   const updateLoadedQuantity = jest.fn();
   const reportIssue = jest.fn();
+  const acknowledgeIssue = jest.fn();
   const controller = new LoadingOperationsController({
     startLoading,
     updateLoadedQuantity,
     reportIssue,
+    acknowledgeIssue,
   } as unknown as LoadingService);
 
   beforeEach(() => {
     startLoading.mockReset();
     updateLoadedQuantity.mockReset();
     reportIssue.mockReset();
+    acknowledgeIssue.mockReset();
   });
 
   it('starts loading as the authenticated Loader', async () => {
@@ -53,6 +56,18 @@ describe('LoadingOperationsController', () => {
     })).resolves.toEqual({ issueId: 'ISSUE-1' });
 
     expect(reportIssue).toHaveBeenCalledWith('TRIP-1', body, {
+      id: 'USR-LDR', role: 'LOADER', depotId: 'DEP-PLG',
+    });
+  });
+
+  it('acknowledges a Dispatcher decision as the authenticated Loader', async () => {
+    acknowledgeIssue.mockResolvedValue({ issueId: 'ISSUE-1', alreadyAcknowledged: false });
+
+    await expect(controller.acknowledgeIssue('ISSUE-1', {
+      user: { id: 'USR-LDR', role: 'LOADER', depotId: 'DEP-PLG' },
+    })).resolves.toEqual({ issueId: 'ISSUE-1', alreadyAcknowledged: false });
+
+    expect(acknowledgeIssue).toHaveBeenCalledWith('ISSUE-1', {
       id: 'USR-LDR', role: 'LOADER', depotId: 'DEP-PLG',
     });
   });
