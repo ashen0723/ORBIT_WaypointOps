@@ -1,6 +1,6 @@
 # Team integration and end-to-end verification
 
-The default browser now signs in to the real API and uses a shared four-role operations workspace. All
+The default browser signs in to the real API. Dispatcher now uses dedicated live screens; Loader, Driver and Store use the shared operations workspace. See [Dispatcher parts 1–6](thisuni-dispatcher-parts-1-6.md) for the follow-up implementation and its expanded checks. All
 business writes go through PostgreSQL transactions; the old role prototypes remain in their directories
 as design references and are no longer mounted by `App.tsx`.
 
@@ -82,7 +82,7 @@ Verified on 2026-10-04 with native PostgreSQL and headless Chromium:
 - Stale outcome preservation, replay of the same conflict, blocked return acknowledgment and explicit reconciliation.
 - Four browser accounts: order → publish → load → depart → capture offline → reload offline → synchronize
   durable image/action exactly once → Store receipt → RECEIVED. No browser runtime exceptions.
-- 52 unit/router/outbox tests: 38 API + 14 web. Contract and active-app type checks and production builds pass.
+- 62 unit/router/outbox tests: 40 API + 22 web (including the Dispatcher follow-up). Contract and active-app type checks and production builds pass.
 
 `decisions.scenarios.cjs` retains its earlier focused delivery/receipt fixtures. The new
 `connected.scenarios.cjs` and `browser.scenarios.cjs` exercise real writes through the API.
@@ -91,7 +91,7 @@ Verified on 2026-10-04 with native PostgreSQL and headless Chromium:
 
 The new workspace is a functional shared integration surface using the existing green/white visual
 language. It replaces four disconnected mock experiences. Existing Designathon layouts, route maps,
-drag-and-drop planning, detailed dashboards and signature drawing are retained as prototype references;
+drag-and-drop planning and signature drawing are retained as prototype references; Dispatcher now has a real dashboard, seven-screen navigation, explicit planning actions and monitoring.
 the active workspace uses forms and uploaded signature images. One item per new-order form is supported
 in the current workspace; the API accepts multiple lines. API amendment and incident endpoints are
 available for owners to build into their detailed screens. This is not a claim of complete visual parity

@@ -159,3 +159,11 @@ export type ResolveFieldConflictRequest = VersionedMutation & {
   reason: string;
 };
 export interface EvidenceUploadResponse { evidenceId: Id; mediaType: string; sizeBytes: number }
+
+export interface RecoveryStateView {
+  deliveryId: Id;
+  version: number;
+  lines: {orderLineId: Id; qty: number}[];
+  /** Historical decisions do not store the delivery version at decision time. */
+  decisions: Omit<RecoveryView, 'sourceDeliveryVersion'>[];
+}

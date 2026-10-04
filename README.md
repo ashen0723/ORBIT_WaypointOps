@@ -39,7 +39,7 @@ Password for every account: `waypoint-demo` (set by `SEED_DEMO_PASSWORD`).
 | Store Manager | `store@waypoint.lk` | `/store` |
 | Store Manager (2nd outlet, permission checks) | `store2@waypoint.lk` | `/store` |
 
-The browser uses real JWT login and a shared API-backed workspace for all four roles.
+The browser uses real JWT login, a dedicated API-backed Dispatcher workspace, and the shared operations workspace for Loader, Driver and Store. See [Dispatcher parts 1–6](docs/thisuni-dispatcher-parts-1-6.md) for implementation and verification.
 See [Team integration and verification](docs/team-integration.md) for setup, handoffs and verified scenarios.
 
 Sessions are per browser tab: open one tab per role to follow an order across roles.
@@ -79,8 +79,8 @@ apps/
   web/                    React 18 + Vite + Tailwind — one app, four roles
     src/app/              root: login gate + role → module routing
     src/features/
-      operations/         Live four-role workspace, durable offline queue
-      dispatcher/         Login/session + retained Dispatcher prototype
+      operations/         Loader/Driver/Store workspace, durable offline queue
+      dispatcher/         Login/session, live Dispatcher screens + retained prototypes
       store-manager/      Store Manager module
       loader/             Loader module
       driver/             Driver module

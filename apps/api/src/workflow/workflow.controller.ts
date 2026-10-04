@@ -66,6 +66,8 @@ export class WorkflowController {
   @Get("depots") @Roles("DISPATCHER") depots() {
     return this.orders.depots();
   }
+  @Get('outlets') @Roles('DISPATCHER') outlets(@Query() q:Record<string,unknown>){return this.orders.outlets(q);}
+  @Get('planning/calendar') @Roles('DISPATCHER') calendar(@Query() q:Record<string,unknown>){return this.orders.calendar(q);}
   @Get("vehicles") @Roles("DISPATCHER") vehicles(
     @Query() q: Record<string, unknown>,
   ) {

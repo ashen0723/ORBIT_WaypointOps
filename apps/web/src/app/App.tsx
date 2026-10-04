@@ -3,9 +3,10 @@ import { LOGIN_PATH } from '@waypoint/contracts';
 import { AuthProvider, useAuth } from './providers/AuthProvider';
 import { RoleRouter, type RoleModules } from './RoleRouter';
 import { Login } from '../features/dispatcher/pages/Login';
+import { DispatcherApp } from '../features/dispatcher/live/DispatcherApp';
 import { OperationsApp } from '../features/operations/OperationsApp';
 
-const ROLE_MODULES: RoleModules = { dispatcher: OperationsApp, store_manager: OperationsApp, loader: OperationsApp, driver: OperationsApp };
+const ROLE_MODULES: RoleModules = { dispatcher: DispatcherApp, store_manager: OperationsApp, loader: OperationsApp, driver: OperationsApp };
 
 const LOGIN_TREE = (
   <BrowserRouter>

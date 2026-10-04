@@ -6,6 +6,7 @@ import { PlanningService } from './planning.service';
 export class PlanningController {
   constructor(private readonly planning: PlanningService) {}
   @Post('drafts') save(@Req() req: AuthRequest, @Body() body: unknown) { return this.planning.saveDraft(req.user, body); }
+  @Get('drafts') listDrafts(@Req() req: AuthRequest,@Query() query:Record<string,unknown>) {return this.planning.listDrafts(req.user,query);}
   @Get('drafts/:id') get(@Param('id') id: string) { return this.planning.getDraft(id); }
   @Patch('drafts/:id') update(@Req() req: AuthRequest, @Param('id') id: string, @Body() body: unknown) { return this.planning.updateDraft(req.user, id, body); }
   @Post('validate') @HttpCode(200) validate(@Body() body: unknown) { return this.planning.validate(body); }

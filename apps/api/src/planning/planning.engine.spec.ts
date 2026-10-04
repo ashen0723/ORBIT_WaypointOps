@@ -46,6 +46,8 @@ describe('authoritative planning feasibility', () => {
     const d = fixture(); d.legs.pop(); d.operatingDay = null; d.handling = [];
     const result = evaluatePlan(plan, d); expect(result.valid).toBe(false); expect(result.totals).toBeNull(); expect(result.stops).toEqual([]);
   });
+  it('rejects Sunday even if a calendar row is accidentally marked operating',()=>{expect(codes(fixture(),{...plan,date:'2026-10-11'})).toContain('NON_OPERATING_DATE');});
+  it('requires the configured Style weekday and reports missing configuration',()=>{const d=fixture();d.orders[0].outlet.brand='STYLE';d.orders[0].outlet.scheduledWeekday=2;expect(codes(d)).toContain('NON_OPERATING_DATE');d.orders[0].outlet.scheduledWeekday=1;expect(evaluatePlan(plan,d).valid).toBe(true);d.orders[0].outlet.scheduledWeekday=null;expect(codes(d)).toContain('REFERENCE_DATA_MISSING');});
   it('rejects nonoperating dates', () => { const d = fixture(); d.operatingDay!.operating = false; expect(codes(d)).toContain('NON_OPERATING_DATE'); });
   it('waits for receiving window and includes that wait in route time', () => {
     const d = fixture(); d.orders[0].outlet.windowOpenTime = '06:00'; expect(evaluatePlan(plan, d).totals?.durationMin).toBe(120);

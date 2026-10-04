@@ -159,11 +159,13 @@ export class DecisionsService {
   private deferralView(d: OrderDeferral): DeferralView {
     return { id: d.id, orderId: d.orderId, fromDate: d.fromDate?.toISOString().slice(0, 10) ?? null, toDate: d.toDate.toISOString().slice(0, 10), reason: d.reason, actorId: d.actorId, recordedAt: d.recordedAt.toISOString() };
   }
-  private async futureRun(tx: Tx, day: string, previous: Date) {
+  private async futureRun(tx: Tx, day: string, previous: Date, orderId: string) {
     if (day <= previous.toISOString().slice(0, 10)) fail(422, 'INVALID_NEXT_DATE', 'Choose a date later than the current run.');
     const calendar = await tx.operatingDay.findUnique({ where: { date: new Date(day) } });
     if (!calendar) fail(422, 'REFERENCE_DATA_MISSING', 'Operating calendar entry is missing.');
-    if (!calendar.operating) fail(422, 'NON_OPERATING_DATE', 'The selected date is not operating.');
+    if (!calendar.operating || new Date(day).getUTCDay()===0) fail(422, 'NON_OPERATING_DATE', 'The selected date is not operating.');
+    const {outlet}=await tx.order.findUniqueOrThrow({where:{id:orderId},include:{outlet:true}});
+    if(outlet.brand==='STYLE'&&(!outlet.scheduledWeekday||new Date(day).getUTCDay()!==outlet.scheduledWeekday))fail(422,'INVALID_NEXT_DATE','Choose this Style outlet’s configured weekly delivery day.');
   }
   async defer(actor: Actor, input: unknown) {
     const body = object(input), id = text(body.orderId, 'orderId'), expected = version(body.expectedVersion), nextDate = date(body.nextDate), reason = text(body.reason, 'reason');
@@ -173,7 +175,7 @@ export class DecisionsService {
       if (order.version !== expected) fail(409, 'STALE_ORDER', 'Order version changed.');
       if (!['CONFIRMED', 'DEFERRED'].includes(order.status) || order.stops.some(s => s.active)) fail(409, 'ORDER_ASSIGNED', 'Safely release/amend the allocation first; an in-transit stop requires rescheduling.');
       const from = order.deferredToDate ?? order.plannedDate ?? order.requestedDate;
-      await this.futureRun(tx, nextDate, from);
+      await this.futureRun(tx, nextDate, from, id);
       const deferral = await tx.orderDeferral.create({ data: { orderId: id, fromDate: from, toDate: new Date(nextDate), reason, actorId: actor.id } });
       const updated = await tx.order.update({ where: { id }, data: { status: 'DEFERRED', plannedDate: new Date(nextDate), deferredToDate: new Date(nextDate), deferReason: reason, deferralCount: { increment: 1 }, version: { increment: 1 } }, include: orderInclude });
       await this.planning.audit(tx, actor, 'Order', id, 'DEFERRED', this.deferralView(deferral), reason);
@@ -193,6 +195,11 @@ export class DecisionsService {
     const conflict = await tx.fieldConflict.findFirst({ where: { resolvedAt: null, OR: [{ action: { path: ['stopId'], equals: stopId } }, { action: { path: ['request', 'tripId'], equals: tripId } }, { action: { path: ['tripId'], equals: tripId } }] } });
     const legacy = await tx.syncAction.findFirst({ where: { status: 'CONFLICT', entityId: { in: [tripId, stopId] } } });
     if (conflict || legacy) fail(409, 'UNRESOLVED_FIELD_CONFLICT', 'Reconcile preserved field facts before changing this attempt balance.');
+  }
+  async recoveryState(id:string){
+    const delivery=await this.db.delivery.findUnique({where:{id},include:recoveryInclude});
+    if(!delivery)fail(404,'NOT_FOUND','Delivery not found.');
+    return {deliveryId:id,version:delivery.version,lines:recoveryBalance(delivery),decisions:delivery.recoveryDecisions.map(r=>({id:r.id,sourceDeliveryId:id,decision:r.decision,decidedById:r.decidedById,decidedAt:r.decidedAt.toISOString(),retryStopId:r.retryStopId}))};
   }
   async recover(actor: Actor, id: string, input: unknown) {
     const body = object(input), expected = version(body.expectedVersion), d = object(body.decision), reason = text(d.reason, 'reason'), lines = inputLines(d.lines, 'qty');
@@ -214,7 +221,7 @@ export class DecisionsService {
       if (lines.some(l => l.qty > (available.find(a => a.orderLineId === l.orderLineId)?.qty ?? 0))) fail(422, 'RECOVERY_QUANTITY_EXCEEDED', 'Recovery cannot exceed this attempt’s undecided returns/receipt discrepancies. Warehouse cancellations are excluded.');
       let pending = order.pendingQuantities === null ? [] : quantities(order.pendingQuantities);
       if (decision.action === 'REDELIVER') {
-        await this.futureRun(tx, decision.nextDate, trip.date);
+        await this.futureRun(tx, decision.nextDate, trip.date, order.id);
         if (pending.length && order.deferredToDate?.toISOString().slice(0, 10) !== decision.nextDate) fail(409, 'RETRY_DATE_CONFLICT', 'Use the same date as the already authorized pending retry, or defer that order first.');
         const totals = new Map(pending.map(l => [l.orderLineId, l.qty]));
         for (const l of lines) totals.set(l.orderLineId, (totals.get(l.orderLineId) ?? 0) + l.qty);
@@ -257,7 +264,7 @@ export class DecisionsService {
       if (trip.releasedAt || trip.status !== 'IN_TRANSIT' || !stop.active || !['PLANNED', 'ARRIVED'].includes(stop.status) || stop.delivery || stop.lines.some(l => l.deliveredQty !== null || l.returnedQty !== null)) fail(409, 'STOP_STATE_CONFLICT', 'Only a nonterminal in-transit stop can be rescheduled; actual handovers use recovery.');
       if (stop.reschedule) fail(409, 'RESCHEDULE_PENDING', 'A reschedule request already exists for this attempt.');
       await this.noConflicts(tx, trip.id, id);
-      await this.futureRun(tx, nextDate, trip.date);
+      await this.futureRun(tx, nextDate, trip.date, stop.orderId);
       const intent: NonNullable<TripView['stops'][number]['reschedule']> = { nextDate, reason, requestedAt: new Date().toISOString(), requestedById: actor.id, acknowledgedAt: null };
       await tx.tripStop.update({ where: { id }, data: { reschedule: json(intent) } });
       await tx.trip.update({ where: { id: trip.id }, data: { planVersion: { increment: 1 }, version: { increment: 1 } } });

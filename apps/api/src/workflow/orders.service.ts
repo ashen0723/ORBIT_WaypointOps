@@ -1,4 +1,6 @@
-import { Injectable } from "@nestjs/common";
+import { nextQuantities, quantityTotals } from "../planning/quantity-plan";
+import type { DispatcherOrderView } from "@waypoint/contracts";
+import { HttpException, Injectable } from "@nestjs/common";
 import type { Actor } from "../auth/auth.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { PlanningService, orderInclude } from "../planning/planning.service";
@@ -185,13 +187,15 @@ export class ConnectedOrdersService {
   }
   async get(actor: Actor, id: string) {
     await this.orderAccess(this.db, actor, id);
-    return this.planning.orderView(
-      await this.db.order.findUniqueOrThrow({
-        where: { id },
-        include: orderInclude,
-      }),
-    );
+    const order = await this.db.order.findUniqueOrThrow({
+      where: { id },
+      include: orderInclude,
+    });
+    return actor.role === "DISPATCHER"
+      ? this.dispatcherOrder(order)
+      : this.planning.orderView(order);
   }
+
   async orders(actor: Actor, query: Record<string, unknown>) {
     const { limit, cursor } = page(query),
       where: Prisma.OrderWhereInput = {};
@@ -201,7 +205,13 @@ export class ConnectedOrdersService {
     } else if (actor.role !== "DISPATCHER")
       fail(403, "FORBIDDEN", "Role cannot list orders.");
     if (cursor) where.id = { gt: cursor };
-    if (query.date) where.plannedDate = new Date(date(query.date));
+    if (query.date) {
+      const day = new Date(date(query.date));
+      where.OR = [
+        { plannedDate: day },
+        { plannedDate: null, requestedDate: day },
+      ];
+    }
     if (query.depotId)
       where.outlet = { depotId: text(query.depotId, "depotId") };
     if (query.status) {
@@ -228,9 +238,112 @@ export class ConnectedOrdersService {
       take: limit + 1,
     });
     return paged(
-      orders.map((o) => this.planning.orderView(o)),
+      orders.map((o) =>
+        actor.role === "DISPATCHER"
+          ? this.dispatcherOrder(o)
+          : this.planning.orderView(o),
+      ),
       limit,
     );
+  }
+  private dispatcherOrder(
+    order: Prisma.OrderGetPayload<{ include: typeof orderInclude }>,
+  ): DispatcherOrderView {
+    let planningLoad: DispatcherOrderView["planningLoad"] = null;
+    if (
+      !order.stops.some((s) => s.active) &&
+      ["CONFIRMED", "DEFERRED"].includes(order.status)
+    ) {
+      try {
+        const lines = nextQuantities(order);
+        const totals = quantityTotals(order, lines);
+        planningLoad = {
+          ...totals,
+          lines,
+          units: lines.reduce((n, l) => n + l.qty, 0),
+        };
+      } catch (error) {
+        if (!(error instanceof HttpException))
+          throw error; /* Unknown ledger/factors stay unavailable; validation returns the reason. */
+      }
+    }
+    return {
+      ...this.planning.orderView(order),
+      outletName: order.outlet.name,
+      depotId: order.outlet.depotId,
+      planningLoad,
+    };
+  }
+  async outlets(query: Record<string, unknown>) {
+    const { limit, cursor } = page(query);
+    return paged(
+      await this.db.outlet.findMany({
+        where: {
+          ...(query.depotId ? { depotId: text(query.depotId, "depotId") } : {}),
+          ...(cursor ? { id: { gt: cursor } } : {}),
+        },
+        select: {
+          id: true,
+          name: true,
+          brand: true,
+          depotId: true,
+          district: true,
+          parkingConstraint: true,
+          windowOpenTime: true,
+          windowCloseTime: true,
+          scheduledWeekday: true,
+        },
+        orderBy: { id: "asc" },
+        take: limit + 1,
+      }),
+      limit,
+    );
+  }
+  async calendar(query: Record<string, unknown>) {
+    const from = date(query.from),
+      to = date(query.to),
+      { limit, cursor } = page(query);
+    if (from > to || (Date.parse(to) - Date.parse(from)) / 86400000 > 366)
+      fail(
+        400,
+        "INVALID_INPUT",
+        "Choose a calendar range of at most 366 days.",
+      );
+    const outlet = query.outletId
+      ? await this.db.outlet.findUnique({
+          where: { id: text(query.outletId, "outletId") },
+        })
+      : null;
+    if (query.outletId && !outlet) fail(404, "NOT_FOUND", "Outlet not found.");
+    if (outlet?.brand === "STYLE" && !outlet.scheduledWeekday)
+      fail(
+        422,
+        "SCHEDULE_NOT_CONFIGURED",
+        "Configure this outlet’s weekly delivery day.",
+      );
+    const rows = await this.db.operatingDay.findMany({
+      where: {
+        operating: true,
+        date: {
+          gte: new Date(from),
+          lte: new Date(to),
+          ...(cursor ? { gt: new Date(date(cursor)) } : {}),
+        },
+      },
+      orderBy: { date: "asc" },
+    });
+    const items = rows
+      .filter(
+        (r) =>
+          r.date.getUTCDay() !== 0 &&
+          (outlet?.brand !== "STYLE" ||
+            r.date.getUTCDay() === outlet.scheduledWeekday),
+      )
+      .map((r) => ({
+        id: r.date.toISOString().slice(0, 10),
+        date: r.date.toISOString().slice(0, 10),
+      }));
+    return paged(items, limit);
   }
   async vehicles(query: Record<string, unknown>) {
     const day = date(query.date),
