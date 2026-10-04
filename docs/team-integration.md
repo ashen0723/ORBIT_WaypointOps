@@ -111,3 +111,25 @@ production storage quotas, retention and object-storage migration are separate w
 
 Verification used disposable test databases. The user's configured application database has **not**
 been migrated or reseeded by this work, and no commit, push or deployment was performed.
+
+
+## JWT auth reconciliation (PR #6)
+
+Authentication configuration is validated at API startup. `JWT_SECRET` must contain at least 32
+non-padding characters and cannot be the example placeholder. `JWT_EXPIRES_IN` defaults to `12h`;
+positive integer seconds and explicit durations are supported, with a minimum lifetime of one second.
+Signing and verification both use HS256.
+
+The current `LoginResponse` remains `{ token, expiresAt, user }`, including nullable outlet/depot/vehicle
+scope fields. Authentication always reloads the account so deactivation and role changes take effect
+on the next request. JWTs without an expiry or a nonempty subject are rejected.
+
+Existing workflow/planning controllers keep `AuthGuard`, `Actor` and their current role annotations.
+`AuthGuard` and the new `JwtAuthGuard` both pass the complete Authorization header to the service;
+only the service parses it. Both role-decorator import paths use `waypoint.roles` and the same
+`RolesGuard`, retaining handler overrides of controller-level roles. New controllers using the split
+guards must apply `JwtAuthGuard` before `RolesGuard`.
+
+Validation: 137 unit/HTTP tests (115 API including importer/auth, 22 web), active frontend/contract and
+Prisma-script type checks, and API build. The native PostgreSQL/Chromium regression checks actual
+four-role login and planning/loading/delivery/receipt/offline flows after reconciliation.

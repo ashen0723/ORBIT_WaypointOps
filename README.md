@@ -17,7 +17,7 @@ Prerequisites: Docker Desktop 4.x (Compose v2) and Git.
 
 ```bash
 cp .env.example .env
-# Set JWT_SECRET in .env to a random secret of at least 32 characters before API login.
+# Set JWT_SECRET in .env to a random secret of at least 32 characters before starting the API.
 docker compose up --build
 ```
 
@@ -50,7 +50,7 @@ Requires Node.js 22+ and Docker (for the database only).
 
 ```bash
 cp .env.example .env
-# Set JWT_SECRET in .env to a random secret of at least 32 characters before API login.
+# Set JWT_SECRET in .env to a random secret of at least 32 characters before starting the API.
 npm install
 docker compose up -d db
 npm run db:deploy -w apps/api
