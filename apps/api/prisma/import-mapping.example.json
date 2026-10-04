@@ -53,6 +53,10 @@
         },
         "windowCloseTime": {
           "column": "<source outlets windowCloseTime column>"
+        },
+        "scheduledWeekday": {
+          "column": "<scheduled-weekday-column>",
+          "onBlank": null
         }
       },
       "depotIds": {

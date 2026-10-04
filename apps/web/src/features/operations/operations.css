@@ -1,0 +1,167 @@
+.operations {
+  min-height: 100vh;
+  background: #f3f6f2;
+  color: #193a30;
+  font:
+    15px/1.55 system-ui,
+    sans-serif;
+}
+.operations header {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 5%;
+  background: #173e32;
+  color: white;
+}
+.operations header span {
+  display: block;
+  font-size: 12px;
+  opacity: 0.8;
+}
+.operations main {
+  max-width: 1100px;
+  margin: auto;
+  padding: 32px 20px 80px;
+}
+.ops-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 12px 0 28px;
+}
+.ops-heading p {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+}
+.operations h1 {
+  font-size: 30px;
+  font-weight: 650;
+}
+.operations h2 {
+  font-size: 19px;
+  font-weight: 650;
+  margin-bottom: 12px;
+}
+.operations h3 {
+  font-weight: 650;
+}
+.ops-card {
+  background: white;
+  border: 1px solid #dce5dd;
+  border-radius: 18px;
+  padding: 24px;
+  margin: 18px 0;
+  box-shadow: 0 4px 18px #173e3206;
+}
+.operations article {
+  border-top: 1px solid #e3eae4;
+  margin-top: 20px;
+  padding-top: 16px;
+}
+.operations label {
+  display: block;
+  max-width: 440px;
+  margin: 10px 0;
+  font-size: 13px;
+  font-weight: 550;
+}
+.operations input,
+.operations select {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  background: white;
+  border: 1px solid #c7d7cc;
+  border-radius: 9px;
+  margin-top: 5px;
+  color: #193a30;
+  font: inherit;
+}
+.operations button {
+  border: 1px solid #225c43;
+  background: #225c43;
+  color: white;
+  border-radius: 9px;
+  padding: 10px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  margin: 8px 8px 8px 0;
+}
+.operations button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.operations header button {
+  border-color: #e0edde;
+}
+.operations details {
+  border-top: 1px solid #e5ece6;
+  margin-top: 16px;
+  padding-top: 12px;
+}
+.operations summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 4px 0;
+}
+.operations fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.operations .check {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  max-width: none;
+}
+.operations .check input {
+  width: 18px;
+  margin: 0;
+}
+.operations [role="alert"] {
+  background: #fff0e9;
+  color: #852f20;
+  padding: 12px;
+  border-radius: 9px;
+  margin: 12px 0;
+}
+.operations [role="status"] {
+  background: #fff6d9;
+  padding: 14px;
+  border-radius: 10px;
+}
+.reference {
+  color: #62776c;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.operations ul {
+  padding-left: 20px;
+  list-style: disc;
+}
+.date-filter {
+  max-width: 200px !important;
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 3px solid #7dcaa0;
+  outline-offset: 3px;
+}
+@media (max-width: 600px) {
+  .operations header {
+    flex-direction: column;
+  }
+  .ops-card {
+    padding: 18px;
+  }
+  .operations main {
+    padding: 20px 12px;
+  }
+  .operations h1 {
+    font-size: 25px;
+  }
+}
