@@ -1,10 +1,13 @@
 import { Module } from '@nestjs/common';
-import { OrdersController } from './orders.controller';
+import { JwtModule } from '@nestjs/jwt';
+import { OrdersController, StoreOrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
+import { StoreAuthGuard } from './store-auth.guard';
 
 @Module({
-  controllers: [OrdersController],
-  providers: [OrdersService],
-  exports: [OrdersService],
+  imports: [JwtModule.register({})],
+  controllers: [OrdersController, StoreOrdersController],
+  providers: [OrdersService, StoreAuthGuard],
+  exports: [OrdersService, StoreAuthGuard, JwtModule],
 })
 export class OrdersModule {}
