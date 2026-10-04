@@ -1,0 +1,142 @@
+{
+  "description": "STRUCTURE ONLY. Copy to a private/local file and replace every placeholder using actual source headers/values. No competition headers are claimed.",
+  "version": 1,
+  "datasets": {
+    "outlets": {
+      "csv": {
+        "delimiter": ",",
+        "encoding": "utf8"
+      },
+      "fields": {
+        "id": {
+          "column": "<source outlets id column>"
+        },
+        "name": {
+          "column": "<source outlets name column>"
+        },
+        "brand": {
+          "column": "<source outlets brand column>",
+          "values": {
+            "<source value for FRESH>": "FRESH",
+            "<source value for STYLE>": "STYLE",
+            "<source value for TECH>": "TECH"
+          }
+        },
+        "district": {
+          "column": "<source outlets district column>"
+        },
+        "depotId": {
+          "column": "<source outlets depotId column>"
+        },
+        "dockType": {
+          "column": "<source outlets dockType column>",
+          "values": {
+            "<source value for REAR_DOCK>": "REAR_DOCK",
+            "<source value for STREET>": "STREET",
+            "<source value for MALL_BAY>": "MALL_BAY"
+          }
+        },
+        "parkingConstraint": {
+          "column": "<source outlets parkingConstraint column>",
+          "values": {
+            "<source value for NORMAL>": "NORMAL",
+            "<source value for VAN_ONLY>": "VAN_ONLY",
+            "<source value for MALL_DOCK>": "MALL_DOCK"
+          }
+        },
+        "mallWindow": {
+          "column": "<source outlets mallWindow column>",
+          "onBlank": null
+        },
+        "windowOpenTime": {
+          "column": "<source outlets windowOpenTime column>"
+        },
+        "windowCloseTime": {
+          "column": "<source outlets windowCloseTime column>"
+        },
+        "scheduledWeekday": {
+          "column": "<scheduled-weekday-column>",
+          "onBlank": null
+        }
+      },
+      "depotIds": {
+        "mode": "identity"
+      },
+      "timeFormat": "HH:mm"
+    },
+    "vehicles": {
+      "csv": {
+        "delimiter": ",",
+        "encoding": "utf8"
+      },
+      "fields": {
+        "id": {
+          "column": "<source vehicles id column>"
+        },
+        "type": {
+          "column": "<source vehicles type column>",
+          "values": {
+            "<source value for TRUCK>": "TRUCK",
+            "<source value for VAN>": "VAN"
+          }
+        },
+        "temp": {
+          "column": "<source vehicles temp column>",
+          "values": {
+            "<source value for REEFER>": "REEFER",
+            "<source value for AMBIENT>": "AMBIENT"
+          }
+        },
+        "weightCapKg": {
+          "column": "<source vehicles weightCapKg column>"
+        },
+        "volumeCapM3": {
+          "column": "<source vehicles volumeCapM3 column>"
+        },
+        "fuelType": {
+          "column": "<source vehicles fuelType column>"
+        },
+        "kmPerL": {
+          "column": "<source vehicles kmPerL column>"
+        },
+        "weeklyFuelQuotaL": {
+          "column": "<source vehicles weeklyFuelQuotaL column>"
+        },
+        "depotId": {
+          "column": "<source vehicles depotId column>"
+        },
+        "available": {
+          "column": "<source vehicles available column>",
+          "values": {
+            "<source true value>": true,
+            "<source false value>": false
+          }
+        }
+      },
+      "depotIds": {
+        "mode": "identity"
+      },
+      "fuelEfficiencyUnit": "kmPerL"
+    },
+    "calendar": {
+      "csv": {
+        "delimiter": ",",
+        "encoding": "utf8"
+      },
+      "fields": {
+        "date": {
+          "column": "<source calendar date column>"
+        },
+        "operating": {
+          "column": "<source calendar operating column>",
+          "values": {
+            "<source true value>": true,
+            "<source false value>": false
+          }
+        }
+      },
+      "scope": "global",
+      "dateFormat": "YYYY-MM-DD"
+    }
+  }
+}
