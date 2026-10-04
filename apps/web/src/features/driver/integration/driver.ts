@@ -45,6 +45,9 @@ export const resolvedStatuses: DeliveryStatus[] = ['Delivered', 'Partially deliv
 export function validateDelivery(items: DriverTrip['stops'][number]['items'], draft: DeliveryDraft): string | null {
   if (draft.outcome !== 'full' && !draft.reason?.trim()) return 'Choose a reason.';
   if (draft.outcome !== 'failed' && (!draft.recipient?.trim() || !draft.signature)) return 'Recipient and signature are required.';
+  // API contract: a failed attempt and reported damage both need photo evidence.
+  if (draft.outcome === 'failed' && !draft.photos.length) return 'Add a photo of the failed attempt.';
+  if (draft.outcome === 'partial' && /damage/i.test(draft.reason ?? '') && !draft.photos.length) return 'Add a photo of the damaged goods.';
   const values = items.map(item => draft.quantities[item.id]);
   if (values.some((value, index) => !Number.isInteger(value) || value < 0 || value > (items[index].loaded ?? items[index].planned))) return 'Delivered quantities must be whole numbers within the available load.';
   if (draft.outcome === 'failed' && values.some(value => value !== 0)) return 'Failed deliveries must have zero delivered quantities.';

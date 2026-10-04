@@ -27,9 +27,12 @@ function useDriverState(integration?: DriverIntegration, user?: {name: string; e
   const getNextStopSequence = (tripId: string) => trips.find(t => t.id === tripId)?.stops.find(s => !resolvedStatuses.includes(getStopRecord(tripId, s.sequence).status))?.sequence ?? null;
   const isTripResolved = (tripId: string) => Boolean(trips.find(t => t.id === tripId)?.stops.length) && getNextStopSequence(tripId) === null;
   const submit = async (action: DriverAction, apply: (state: SyncState) => void) => {
-    const key = `${action.tripId}-${'sequence' in action ? action.sequence : action.kind}`;
-    const actionKey = `${key}-${action.kind}`;
-    if (action.kind !== 'issue' && accepted.current.has(actionKey)) throw new Error('This action has already been accepted.');
+    const actionKey = `${action.tripId}-${'sequence' in action ? action.sequence : ''}-${action.kind}`;
+    // Issue reports may run alongside the same stop's arrival/outcome.
+    const key = action.kind === 'issue' ? actionKey : `${action.tripId}-${'sequence' in action ? action.sequence : action.kind}`;
+    // With an integration, the server-backed stop status and idempotency keys guard repeats; a stale in-memory
+    // guard would block a legitimate resubmission after a rejected sync.
+    if (!integration && action.kind !== 'issue' && accepted.current.has(actionKey)) throw new Error('This action has already been accepted.');
     if (busy.current.has(key)) throw new Error('This action is already being processed.');
     busy.current.add(key); setError(null);
     try {
