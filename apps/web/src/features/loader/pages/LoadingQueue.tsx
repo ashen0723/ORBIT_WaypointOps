@@ -69,7 +69,6 @@ const visibleForFilter:
   ready: [
     'ready',
     'ready_to_load',
-    'ready_to_depart',
   ],
 
   in_progress: [
@@ -85,6 +84,7 @@ const visibleForFilter:
   ],
 
   completed: [
+    'ready_to_depart',
     'completed',
     'loading_completed',
   ],
@@ -237,7 +237,6 @@ export function LoadingQueue() {
               [
                 'ready',
                 'ready_to_load',
-                'ready_to_depart',
               ].includes(
                 load.status,
               ),
@@ -271,6 +270,7 @@ export function LoadingQueue() {
           loads.filter(
             (load) =>
               [
+                'ready_to_depart',
                 'completed',
                 'loading_completed',
               ].includes(
@@ -294,6 +294,7 @@ export function LoadingQueue() {
         .filter(
           (load) =>
             ![
+              'ready_to_depart',
               'completed',
               'loading_completed',
             ].includes(
@@ -772,7 +773,6 @@ function LoadCard({
       'ready_to_load',
       'in_progress',
       'loading',
-      'ready_to_depart',
     ].includes(load.status);
 
   return (
@@ -984,7 +984,7 @@ function labelFor(
     load.status ===
     'ready_to_depart'
   ) {
-    return 'Final Check';
+    return 'View Load';
   }
 
   if (
@@ -1004,6 +1004,14 @@ function destinationFor(
 ) {
   if (!load.tripId) {
     return '/';
+  }
+
+  if (
+    load.status === 'ready_to_depart' ||
+    load.status === 'completed' ||
+    load.status === 'loading_completed'
+  ) {
+    return `/completed/${encodeURIComponent(load.tripId)}`;
   }
 
   return `/trips/${encodeURIComponent(

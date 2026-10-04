@@ -10,6 +10,7 @@ import {
 
 import {
   ClipboardCheckIcon,
+  RefreshCwIcon,
   TruckIcon,
 } from 'lucide-react';
 
@@ -124,6 +125,9 @@ export function App({
 function CompletedLoadsIndex() {
   const {
     queueLoads,
+    queueLoading,
+    queueError,
+    refreshQueue,
     handedOffVehicleIds,
   } = useLoader();
 
@@ -135,6 +139,8 @@ function CompletedLoadsIndex() {
         }
 
         return (
+          load.status ===
+          'ready_to_depart' ||
           load.status ===
           'completed' ||
           load.status ===
@@ -218,7 +224,8 @@ function CompletedLoadsIndex() {
 
                 <Link
                   to={`/completed/${encodeURIComponent(
-                    load.tripId!,
+                    load.tripId ??
+                    load.vehicleId,
                   )}`}
                   className={`${buttonStyles(
                     'secondary',
@@ -241,23 +248,41 @@ function CompletedLoadsIndex() {
           </span>
 
           <h2 className="mt-4 text-lg font-semibold text-ink">
-            No completed
-            loads
+            {queueLoading
+              ? 'Loading completed loads…'
+              : queueError
+                ? 'Could not load completed loads'
+                : 'No completed loads'}
           </h2>
 
           <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-subtle">
-            Completed loading
-            trips for this
-            Loader&apos;s depot
-            will appear here.
+            {queueLoading
+              ? 'Retrieving persisted loading records from the Loader backend.'
+              : queueError ?? 'Completed loading trips for this Loader’s depot will appear here.'}
           </p>
+
+          {queueError && (
+            <button
+              type="button"
+              onClick={() => {
+                void refreshQueue();
+              }}
+              className={`${buttonStyles('secondary', 'md')} mt-5`}
+            >
+              <RefreshCwIcon
+                aria-hidden="true"
+                className="h-4 w-4"
+              />
+              Try again
+            </button>
+          )}
 
           <Link
             to="/"
             className={`${buttonStyles(
               'secondary',
               'md',
-            )} mt-5`}
+            )} mt-5 ${queueError ? 'ml-3' : ''}`}
           >
             <TruckIcon
               aria-hidden="true"

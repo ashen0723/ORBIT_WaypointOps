@@ -1,6 +1,4 @@
-import React, {
-  useMemo,
-} from 'react';
+import { useEffect } from 'react';
 
 import {
   Link,
@@ -10,6 +8,7 @@ import {
 import {
   ClipboardCheckIcon,
   PackageCheckIcon,
+  RefreshCwIcon,
 } from 'lucide-react';
 
 import { useLoader } from '../contexts/LoaderContext';
@@ -39,6 +38,9 @@ export function QueueCompletedLoad() {
     tripDataById,
     quantities,
     issues,
+    tripLoadingId,
+    tripErrors,
+    loadTrip,
   } = useLoader();
 
   const tripId =
@@ -55,12 +57,32 @@ export function QueueCompletedLoad() {
       ]
       : undefined;
 
-  if (
-    !tripId ||
-    !trip
-  ) {
+  useEffect(() => {
+    if (
+      tripId &&
+      !trip &&
+      tripLoadingId !== tripId &&
+      !tripErrors[tripId]
+    ) {
+      void loadTrip(tripId);
+    }
+  }, [loadTrip, trip, tripErrors, tripId, tripLoadingId]);
+
+  if (!tripId) {
     return (
       <CompletedUnavailable />
+    );
+  }
+
+  if (!trip) {
+    return (
+      <CompletedUnavailable
+        loading={tripLoadingId === tripId}
+        error={tripErrors[tripId]}
+        onRetry={() => {
+          void loadTrip(tripId);
+        }}
+      />
     );
   }
 
@@ -70,41 +92,28 @@ export function QueueCompletedLoad() {
   } = trip;
 
   const ordersWithActuals =
-    useMemo(
-      () =>
-        orders.map(
-          (order) => ({
-            ...order,
+    orders.map(
+      (order) => ({
+        ...order,
 
-            items:
-              order.items.map(
-                (item) => ({
-                  ...item,
+        items:
+          order.items.map(
+            (item) => ({
+              ...item,
 
-                  loaded:
-                    quantities[
-                    item.id
-                    ] ??
-                    item.loaded,
-                }),
-              ),
-          }),
-        ),
-      [
-        orders,
-        quantities,
-      ],
+              loaded:
+                quantities[
+                item.id
+                ] ??
+                item.loaded,
+            }),
+          ),
+      }),
     );
 
   const totals =
-    useMemo(
-      () =>
-        computeLoadTotals(
-          ordersWithActuals,
-        ),
-      [
-        ordersWithActuals,
-      ],
+    computeLoadTotals(
+      ordersWithActuals,
     );
 
   const tripIssues =
@@ -309,7 +318,15 @@ function SummaryMetric({
   );
 }
 
-function CompletedUnavailable() {
+function CompletedUnavailable({
+  loading = false,
+  error,
+  onRetry,
+}: {
+  loading?: boolean;
+  error?: string;
+  onRetry?: () => void;
+}) {
   return (
     <PageContainer>
       <Card className="mx-auto max-w-lg p-8 text-center">
@@ -319,27 +336,41 @@ function CompletedUnavailable() {
         />
 
         <h1 className="mt-4 text-xl font-semibold text-ink">
-          Completed load
-          unavailable
+          {loading
+            ? 'Loading completed record…'
+            : error
+              ? 'Could not load completed record'
+              : 'Completed load unavailable'}
         </h1>
 
         <p className="mt-2 text-sm leading-6 text-subtle">
-          Completed loading
-          records will appear
-          here when they are
-          retrieved from the
-          Loader backend.
+          {loading
+            ? 'Retrieving the final quantities and loading exceptions.'
+            : error ?? 'This completed loading record is not available.'}
         </p>
 
+        {error && onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className={`${buttonStyles('secondary', 'md')} mt-6`}
+          >
+            <RefreshCwIcon
+              aria-hidden="true"
+              className="h-4 w-4"
+            />
+            Try again
+          </button>
+        )}
+
         <Link
-          to="/"
+          to="/completed"
           className={`${buttonStyles(
             'primary',
             'md',
-          )} mt-6`}
+          )} mt-6 ${error ? 'ml-3' : ''}`}
         >
-          Back to Loading
-          Queue
+          Completed Loads
         </Link>
       </Card>
     </PageContainer>
