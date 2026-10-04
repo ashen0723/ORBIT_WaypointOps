@@ -8,7 +8,7 @@ export function fixture(): PlanningData {
   return {
     vehicle: { id: 'V', depotId: 'D', type: 'TRUCK', temp: 'REEFER', weightCapKg: 100, volumeCapM3: 10, fuelType: 'diesel', kmPerL: 10, weeklyFuelQuotaL: 20, available: true, drivers: [{ id: 'driver' }], createdAt: stamp, updatedAt: stamp },
     orders: [{ id: 'O', outletId: 'A', temp: 'CHILLED', requestedDate: new Date(plan.date), plannedDate: null, status: 'CONFIRMED', units: 20, weightKg: 80, volumeM3: 8, deferralCount: 0, deferReason: null, deferredToDate: null, version: 1, recoveryPending: false, pendingQuantities: null, createdById: 'store', createdAt: stamp, updatedAt: stamp,
-      outlet: { id: 'A', name: 'Outlet', brand: 'FRESH', district: 'Colombo', depotId: 'D', dockType: 'REAR_DOCK', parkingConstraint: 'NORMAL', mallWindow: null, windowOpenTime: '04:00', windowCloseTime: '10:00', createdAt: stamp, updatedAt: stamp },
+      outlet: { id: 'A', name: 'Outlet', brand: 'FRESH', district: 'Colombo', depotId: 'D', dockType: 'REAR_DOCK', parkingConstraint: 'NORMAL', mallWindow: null, scheduledWeekday: null, windowOpenTime: '04:00', windowCloseTime: '10:00', createdAt: stamp, updatedAt: stamp },
       lines: [{ id: 'L', orderId: 'O', item: 'Item', unit: 'box', requestedQty: 20, cancelledQty: 0, unitWeightKg: null, unitVolumeM3: null, loadedQty: null, deliveredQty: null, createdAt: stamp, updatedAt: stamp }], stops: [] }],
     trips: [], operatingDay: { date: new Date(plan.date), operating: true }, availability: null,
     legs: [{ id: 'out', fromKey: 'depot:D', toKey: 'outlet:A', distanceKm: 40, durationMin: 30, source: 'test' }, { id: 'back', fromKey: 'outlet:A', toKey: 'depot:D', distanceKm: 60, durationMin: 45, source: 'test' }],
@@ -17,7 +17,7 @@ export function fixture(): PlanningData {
 }
 const codes = (data: PlanningData, p = plan) => evaluatePlan(p, data).reasons.map(r => r.code);
 function existingTrip(data: PlanningData, overrides: Record<string, unknown> = {}) {
-  data.trips.push({ id: 'T', vehicleId: 'V', depotId: 'D', date: new Date(plan.date), tripNo: 1, status: 'CONFIRMED', plannedDeparture: '09:00', totalWeightKg: 10, totalVolumeM3: 1, distanceKm: 50, createdAt: new Date(), updatedAt: new Date(), version: 1, planVersion: 1, driverId: 'driver', publishedAt: null, loaderAcknowledgedPlanVersion: null, releasedAt: null, plannedDepartureAt: localInstant(plan.date, '09:00'), plannedReturnAt: localInstant(plan.date, '10:00'), fuelWeekStart: weekStart(plan.date), reservedFuelL: 5, committedFuelL: 0, ...overrides });
+  data.trips.push({ id: 'T', vehicleId: 'V', depotId: 'D', date: new Date(plan.date), tripNo: 1, status: 'CONFIRMED', plannedDeparture: '09:00', totalWeightKg: 10, totalVolumeM3: 1, distanceKm: 50, createdAt: new Date(), updatedAt: new Date(), version: 1, planVersion: 1, driverId: 'driver', publishedAt: null, loaderAcknowledgedPlanVersion: null, releasedAt: null, plannedDepartureAt: localInstant(plan.date, '09:00'), plannedReturnAt: localInstant(plan.date, '10:00'), fuelWeekStart: weekStart(plan.date), reservedFuelL: 5, committedFuelL: 0, departedAt: null, departedPlanVersion: null, ...overrides });
 }
 describe('authoritative planning feasibility', () => {
   it('includes service and directed return travel/fuel', () => {

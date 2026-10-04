@@ -39,8 +39,8 @@ Password for every account: `waypoint-demo` (set by `SEED_DEMO_PASSWORD`).
 | Store Manager | `store@waypoint.lk` | `/store` |
 | Store Manager (2nd outlet, permission checks) | `store2@waypoint.lk` | `/store` |
 
-The browser still uses prototype sessions/data; the backend now has JWT login, planning, shortfall/recovery decisions, deferral and rescheduling endpoints.
-See [Planning backend](docs/planning-backend.md) for API setup and its current scope.
+The browser uses real JWT login and a shared API-backed workspace for all four roles.
+See [Team integration and verification](docs/team-integration.md) for setup, handoffs and verified scenarios.
 
 Sessions are per browser tab: open one tab per role to follow an order across roles.
 
@@ -55,6 +55,7 @@ npm install
 docker compose up -d db
 npm run db:deploy -w apps/api
 npm run db:seed -w apps/api
+npm run db:seed:planning-demo -w apps/api # optional fictional catalog/calendar/travel fixtures
 npm run dev:api
 npm run dev:web
 ```
@@ -78,7 +79,8 @@ apps/
   web/                    React 18 + Vite + Tailwind — one app, four roles
     src/app/              root: login gate + role → module routing
     src/features/
-      dispatcher/         Dispatcher module (+ leader's Login, session, in-browser mock server)
+      operations/         Live four-role workspace, durable offline queue
+      dispatcher/         Login/session + retained Dispatcher prototype
       store-manager/      Store Manager module
       loader/             Loader module
       driver/             Driver module
@@ -103,11 +105,11 @@ docker-compose.yml        db + api + web
 | Platform | `apps/web/src/app`, `src/api` | `apps/api/src/auth`, `users`, `prisma/`, Docker |
 
 Schema changes: edit `apps/api/prisma/schema.prisma`, create a migration, and coordinate with the DB owner
-before merging. See [docs/architecture.md](docs/architecture.md) for the swap seam from mock data to the API.
+before merging. The integration adapters currently live in `apps/api/src/workflow`; see [team handoffs](docs/team-integration.md) before moving endpoints into owner modules.
 
 ## Judge walkthrough
 
-_To be completed once the backend flows are connected._ Planned outline:
+The connected walkthrough and runnable automated checks are in [Team integration](docs/team-integration.md).
 
 1. Store Manager places an order and notes the order ID.
 2. Dispatcher finds the same order, sees an invalid vehicle rejected with a reason, allocates correctly and publishes.
@@ -118,12 +120,14 @@ _To be completed once the backend flows are connected._ Planned outline:
 
 ## Departures from the Designathon submission
 
-_To be completed by module owners._ Merge-level changes are in [docs/merge-notes.md](docs/merge-notes.md).
+The live form-based integration workspace replaces the disconnected mock modules. Detailed differences and retained prototype features are documented in [Team integration](docs/team-integration.md). Merge-level changes are in [docs/merge-notes.md](docs/merge-notes.md).
 
 ## Documentation
 
+- [Team integration and final verification](docs/team-integration.md)
+
 - [API and workflow contract v1](docs/api-contract-v1.md) — agreed rules, shared DTOs, endpoint ownership,
-  and endpoint ownership. [Planning backend](docs/planning-backend.md) tracks implemented routes and remaining handoffs.
+  implementation handoffs. [Planning backend](docs/planning-backend.md) tracks implemented routes and remaining handoffs.
 - [Shortfall, recovery, deferral and rescheduling](docs/decisions-and-rescheduling.md)
 - [Architecture](docs/architecture.md)
 - [Data model](docs/data-model.md)

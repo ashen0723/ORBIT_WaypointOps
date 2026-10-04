@@ -1,5 +1,7 @@
 # Planning backend milestone
 
+> Integration update: the real four-role workspace and connected Order/Delivery/Receipt/Sync APIs are now implemented. See [team integration and verification](team-integration.md) for current setup, migrations and test evidence; older handoff notes below describe the earlier phase.
+
 This milestone implements a persistent, authenticated Draft → Allocate → Publish API. The browser
 prototypes are not connected to these endpoints yet. Contract DTOs remain in `@waypoint/contracts`;
 the API consumes emitted declarations, and runtime input validation lives in the API.

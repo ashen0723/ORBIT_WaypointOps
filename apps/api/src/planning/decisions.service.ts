@@ -87,6 +87,8 @@ export class DecisionsService {
       const stop = trip.stops.find(s => s.active && s.lines.some(l => l.orderLineId === lineId));
       const line = stop?.lines.find(l => l.orderLineId === lineId);
       if (!stop || !line) fail(404, 'NOT_FOUND', 'Line is not assigned to this trip.');
+      const evidence = await tx.evidence.count({where:{id:{in:[...new Set(photoRefs)]},ownerId:actor.id,orderId:stop.orderId}});
+      if(evidence !== new Set(photoRefs).size) fail(403,'INVALID_EVIDENCE_SCOPE','Loading evidence is missing or outside this account/order.');
       const record = await tx.loadingRecord.findUnique({ where: { tripId: id } });
       if (!record) fail(409, 'LOADING_NOT_STARTED', 'Start loading first.');
       if (availableQty >= line.plannedQty - line.cancelledQty) fail(422, 'NO_SHORTFALL', 'Available quantity must be below the approved quantity.');
@@ -236,7 +238,9 @@ export class DecisionsService {
     const pending = order.pendingQuantities === null ? [] : quantities(order.pendingQuantities);
     const unresolved = deliveries.some(d => recoveryBalance(d).some(l => l.qty > 0));
     const awaitingReceipt = deliveries.some(d => d.stop.lines.some(l => (l.deliveredQty ?? 0) > 0) && (!d.receipt || d.receipt.status === 'PENDING'));
-    const review = deliveries.some(d => d.requiresDispatcherReview);
+    const conflictFilters = order.stops.flatMap(s => [{action:{path:['stopId'],equals:s.id}}, {action:{path:['request','tripId'],equals:s.tripId}}]);
+    const fieldReview = conflictFilters.length ? await tx.fieldConflict.findFirst({where:{resolvedAt:null,OR:conflictFilters}}) : null;
+    const review = deliveries.some(d => d.requiresDispatcherReview) || !!fieldReview;
     const active = order.stops.some(s => s.active);
     const recoveryPending = unresolved || pending.some(l => l.qty > 0);
     const anyHandover = deliveries.some(d => d.stop.lines.some(l => (l.deliveredQty ?? 0) > 0));

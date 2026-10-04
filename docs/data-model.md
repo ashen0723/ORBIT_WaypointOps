@@ -1,5 +1,7 @@
 # Data model
 
+> Integration update: the real four-role workspace and connected Order/Delivery/Receipt/Sync APIs are now implemented. See [team integration and verification](team-integration.md) for current setup, migrations and test evidence; older handoff notes below describe the earlier phase.
+
 The [API and workflow contract v1](api-contract-v1.md) records the agreed cancellation, delivery-attempt,
 plan-version and sync behavior. Migration `0002_planning_contract` adds the planning and quantity-history foundation;
 `0003_decisions_and_rescheduling` adds the decision/acknowledgement stamps, pending quantities and deferral history.

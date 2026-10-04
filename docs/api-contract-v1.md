@@ -1,5 +1,7 @@
 # Waypoint API and workflow contract v1
 
+Implementation status and runnable end-to-end verification: [team integration](team-integration.md). The agreed wire DTOs below remain the integration boundary.
+
 **Baseline date:** 2026-10-04. **Domain owner:** Ashen. **Database/platform owner:** Tharusha.
 
 This is the implementation contract for the first connected four-role workflow. Ashen approved the

@@ -163,6 +163,7 @@ model Outlet {
   depotId           String
   dockType          DockType
   parkingConstraint ParkingConstraint
+  scheduledWeekday  Int? // STYLE outlet weekly weekday, ISO 1=Monday..6=Saturday
   mallWindow        String? // "HH:MM-HH:MM"; null outside malls
   windowOpenTime    String // "HH:MM"
   windowCloseTime   String // "HH:MM"
@@ -280,6 +281,8 @@ model Trip {
   fuelWeekStart                 DateTime? @db.Date
   reservedFuelL                 Float     @default(0)
   committedFuelL                Float     @default(0)
+  departedAt                    DateTime?
+  departedPlanVersion           Int?
 
   // Active slot uniqueness is a partial index in migration 0002.
   @@index([vehicleId, date, tripNo])
@@ -365,6 +368,8 @@ model Delivery {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
+  recorded                 Json?
+  capturedAt               DateTime?
   version                  Int                @default(1)
   requiresDispatcherReview Boolean            @default(false)
   recoveryDecisions        RecoveryDecision[]
@@ -586,4 +591,39 @@ model OrderDeferral {
   order        Order     @relation(fields: [orderId], references: [id])
 
   @@index([orderId, recordedAt])
+}
+
+model CatalogItem {
+  id           String          @id @default(cuid())
+  brand        Brand
+  name         String
+  unit         String
+  temp         TempRequirement
+  unitWeightKg Float
+  unitVolumeM3 Float
+  active       Boolean         @default(true)
+}
+
+// Durable access-controlled bytes: no public upload directory or expiring browser URLs.
+model Evidence {
+  id        String   @id @default(cuid())
+  ownerId   String
+  orderId   String
+  tripId    String?
+  mediaType String
+  sizeBytes Int
+  bytes     Bytes
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+}
+
+model DriverIssue {
+  id         String   @id @default(cuid())
+  tripId     String
+  stopId     String?
+  userId     String
+  recorded   Json
+  capturedAt DateTime
+  recordedAt DateTime @default(now())
 }

@@ -2,7 +2,7 @@
   "name": "orbit-waypoint",
   "version": "0.1.0",
   "private": true,
-  "description": "Waypoint Group delivery operations platform — Tech-Triathlon 2026",
+  "description": "Waypoint Group delivery operations platform \u2014 Tech-Triathlon 2026",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -15,6 +15,8 @@
     "dev:api": "npm run start:dev -w apps/api",
     "build": "npm run build -w apps/web && npm run build -w apps/api",
     "test:contracts": "npm run typecheck -w packages/contracts",
-    "test": "npm run test:contracts && npm test -w apps/web && npm test -w apps/api"
+    "test": "npm run test:contracts && npm test -w apps/web && npm test -w apps/api",
+    "test:e2e": "npm run build && BROWSER_E2E=1 node apps/api/test/planning.integration.cjs --postgres",
+    "typecheck": "npm run test:contracts && npm run typecheck -w apps/web"
   }
 }

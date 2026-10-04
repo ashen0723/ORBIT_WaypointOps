@@ -1,5 +1,7 @@
 # Shortfall, recovery, deferral and rescheduling
 
+> Integration update: the real four-role workspace and connected Order/Delivery/Receipt/Sync APIs are now implemented. See [team integration and verification](team-integration.md) for current setup, migrations and test evidence; older handoff notes below describe the earlier phase.
+
 These endpoints extend the persistent planning backend. They run with the same actor-bound idempotency
 ledger, version checks, serializable transactions/retries and audit events. The frontend remains a separate
 integration task. No production database was migrated as part of this change.
