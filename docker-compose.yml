@@ -13,7 +13,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # Loopback only: reachable from this machine (local dev, DB tools), never from the network.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-waypoint} -d ${POSTGRES_DB:-waypoint}"]
       interval: 5s
@@ -58,8 +59,10 @@ services:
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
     depends_on:
+      # Start as soon as the api container exists: the role modules still run on in-browser mock data, so the
+      # app must stay usable even if migrations or the seed fail. nginx only needs the "api" hostname to resolve.
       api:
-        condition: service_healthy
+        condition: service_started
     ports:
       - "${WEB_PORT:-8080}:80"
     restart: unless-stopped
