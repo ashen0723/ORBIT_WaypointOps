@@ -1,25 +1,28 @@
-import React from 'react';
+import { useState } from 'react';
 import { AlertTriangleIcon, CheckIcon, SnowflakeIcon } from 'lucide-react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { PageIntro } from '../../components/driver/PageIntro';
 import { StateBanner } from '../../components/driver/StateBanner';
 import { Button } from '../../components/ui/Button';
 import { useDriver } from '../../contexts/DriverContext';
-import { TRIPS } from '../../data/driver';
 
 export function TripCheck() {
   const { tripId } = useParams();
   const navigate = useNavigate();
-  const { loaderFlagsAcknowledged, acknowledgeLoaderFlags, departTrip } = useDriver();
+  const { trips: TRIPS, loaderFlagsAcknowledged, acknowledgeLoaderFlags, departTrip } = useDriver();
   const trip = TRIPS.find((candidate) => candidate.id === tripId);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
   if (!trip) return <Navigate to="/" replace />;
   const totalCases = trip.stops.reduce((sum, stop) => sum + stop.cases, 0);
   const chilledCases = trip.stops.reduce((sum, stop) => sum + stop.chilledCases, 0);
   const acknowledged = Boolean(loaderFlagsAcknowledged[trip.id]);
 
-  const depart = () => {
-    departTrip(trip.id);
-    navigate(`/trips/${trip.id}/stops`);
+  const depart = async () => {
+    setBusy(true);
+    try { await departTrip(trip.id); navigate(`/trips/${trip.id}/stops`); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Departure failed.'); }
+    finally { setBusy(false); }
   };
 
   return (
@@ -52,8 +55,10 @@ export function TripCheck() {
             <input type="checkbox" checked={acknowledged} onChange={(event) => acknowledgeLoaderFlags(trip.id, event.target.checked)} className="h-6 w-6 rounded border-line text-brand focus:ring-brand" />
             <span className="font-semibold text-amber-ink">I've seen the loader flags</span>
           </label>
-          <div className="rounded-card bg-brand-pale p-4 text-sm leading-5 text-forest"><CheckIcon aria-hidden className="mr-2 inline h-4 w-4" />Dispatcher and stores on this trip will be notified when you depart.</div>
-          <Button size="lg" fullWidth disabled={Boolean(trip.loaderFlag) && !acknowledged} onClick={depart}><AlertTriangleIcon aria-hidden className="h-5 w-5" />Depart — start trip</Button>
+          <div className="rounded-card bg-brand-pale p-4 text-sm leading-5 text-forest"><CheckIcon aria-hidden className="mr-2 inline h-4 w-4" />Departure is confirmed only after the integration layer accepts it.</div>
+          {trip.status !== 'Loaded' && <p role="status">Waiting for Loader to release this trip.</p>}
+          {error && <p role="alert">{error}</p>}
+          <Button size="lg" fullWidth disabled={trip.status !== 'Loaded' || busy || (Boolean(trip.loaderFlag) && !acknowledged)} onClick={depart}><AlertTriangleIcon aria-hidden className="h-5 w-5" />Depart — start trip</Button>
         </div>
       </div>
     </div>);

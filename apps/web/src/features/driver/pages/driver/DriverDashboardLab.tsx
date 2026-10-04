@@ -1,4 +1,3 @@
-import React from 'react';
 import { BellIcon, SearchIcon, SnowflakeIcon, TriangleAlertIcon } from 'lucide-react';
 import { DashboardMetricCard } from '../../components/driver-dashboard/DashboardMetricCard';
 import { DashboardStopQueue } from '../../components/driver-dashboard/DashboardStopQueue';
@@ -11,10 +10,9 @@ import { DriverProfileSummary } from '../../components/driver/DriverProfileSumma
 import { PageIntro } from '../../components/driver/PageIntro';
 import { StateBanner } from '../../components/driver/StateBanner';
 import { useDriver } from '../../contexts/DriverContext';
-import { DRIVER, TRIPS } from '../../data/driver';
 
 export function DriverDashboardLab() {
-  const { connection, getStopRecord } = useDriver();
+  const { identity: DRIVER, trips: TRIPS, connection, getStopRecord } = useDriver();
   const stops = TRIPS.flatMap((trip) => trip.stops.map((stop) => ({ tripId: trip.id, stop })));
   const records = stops.map(({ tripId, stop }) => getStopRecord(tripId, stop.sequence));
   const resolved = records.filter((record) => ['Delivered', 'Partially delivered', 'Failed', 'Changed by dispatcher'].includes(record.status)).length;

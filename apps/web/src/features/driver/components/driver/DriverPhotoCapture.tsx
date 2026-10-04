@@ -1,10 +1,11 @@
-import React, { ChangeEvent, useRef } from 'react';
+import { ChangeEvent, useEffect, useRef } from 'react';
 import { CameraIcon, CheckIcon, XIcon } from 'lucide-react';
 
 export interface DriverPhoto {
   id: string;
   name: string;
   url: string;
+  file: File;
 }
 
 interface DriverPhotoCaptureProps {
@@ -17,12 +18,17 @@ interface DriverPhotoCaptureProps {
 export function DriverPhotoCapture({ photos, onChange, required = false, label = 'Photo' }: DriverPhotoCaptureProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const previews = useRef(new Set<string>());
+  useEffect(() => () => { previews.current.forEach(url => URL.revokeObjectURL(url)); }, []);
+
   const handleFiles = (event: ChangeEvent<HTMLInputElement>) => {
     const added = Array.from(event.target.files ?? []).map((file) => ({
       id: `${file.name}-${Date.now()}`,
       name: file.name,
+      file,
       url: URL.createObjectURL(file)
     }));
+    added.forEach(photo => previews.current.add(photo.url));
     onChange([...photos, ...added]);
     event.target.value = '';
   };

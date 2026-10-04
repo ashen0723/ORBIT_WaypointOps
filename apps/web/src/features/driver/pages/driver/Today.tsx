@@ -1,12 +1,12 @@
-import React from 'react';
+import { useDriver } from '../../contexts/DriverContext';
 import { MapPinIcon, SnowflakeIcon, TruckIcon } from 'lucide-react';
-import { DRIVER, TRIPS } from '../../data/driver';
 import { Card } from '../../components/ui/Card';
 import { PageIntro } from '../../components/driver/PageIntro';
 import { StateBanner } from '../../components/driver/StateBanner';
 import { TripCard } from '../../components/driver/TripCard';
 
 export function Today() {
+  const { identity: DRIVER, trips: TRIPS } = useDriver();
   const allStops = TRIPS.flatMap((trip) => trip.stops);
   const summary = [
   { label: 'Total stops', value: allStops.length },
@@ -17,8 +17,8 @@ export function Today() {
 
   return (
     <div className="space-y-5 md:space-y-6">
-      <div className="xl:hidden"><PageIntro meta={DRIVER.date} title={`Good morning, ${DRIVER.name.split(' ')[0]}`} description="Your route is ready. Complete the vehicle and load check before leaving Kandy depot." /></div>
-      <StateBanner tone="success" title="Route saved for offline use ✓" detail="Last synced 03:58" />
+      <div className="xl:hidden"><PageIntro meta={DRIVER.date} title={`Good morning, ${DRIVER.name.split(' ')[0]}`} description="Review released trips and complete the vehicle and load check before departure." /></div>
+      <StateBanner tone="success" title="Available route preview" detail="Check the sync panel for actual save status." />
 
       <Card className="hidden grid-cols-4 divide-x divide-line py-4 xl:grid" role="group" aria-label="Today's totals">
         {summary.map((item) =>
@@ -44,6 +44,7 @@ export function Today() {
           <h2 id="trips-heading" className="text-lg font-bold text-ink">Today's trips</h2>
           <span className="text-sm font-semibold text-subtle">2 trips</span>
         </div>
+        {TRIPS.length === 0 && <p role="status">No assigned released trips are available.</p>}
         {TRIPS.map((trip) => <TripCard key={trip.id} trip={trip} />)}
       </section>
       <p className="pb-2 text-center text-xs leading-5 text-subtle">Use the app only when safely stopped.</p>

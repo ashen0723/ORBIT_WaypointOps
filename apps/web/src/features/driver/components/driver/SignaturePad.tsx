@@ -1,16 +1,23 @@
-import React, { PointerEvent, useRef, useState } from 'react';
+import { PointerEvent, useEffect, useRef, useState } from 'react';
 import { RotateCcwIcon } from 'lucide-react';
 
 type Point = {x: number;y: number;};
 
 interface SignaturePadProps {
   onSignedChange: (signed: boolean) => void;
+  onSignatureChange?: (svg: string | undefined) => void;
 }
 
-export function SignaturePad({ onSignedChange }: SignaturePadProps) {
+export function SignaturePad({ onSignedChange, onSignatureChange }: SignaturePadProps) {
   const surfaceRef = useRef<SVGSVGElement>(null);
   const [strokes, setStrokes] = useState<Point[][]>([]);
   const [drawing, setDrawing] = useState(false);
+
+  useEffect(() => {
+    const valid = strokes.some(stroke => stroke.length > 1);
+    onSignedChange(valid);
+    onSignatureChange?.(valid ? surfaceRef.current?.outerHTML : undefined);
+  }, [strokes, onSignedChange, onSignatureChange]);
 
   const pointFromEvent = (event: PointerEvent<SVGSVGElement>): Point => {
     const bounds = surfaceRef.current?.getBoundingClientRect();
@@ -27,7 +34,6 @@ export function SignaturePad({ onSignedChange }: SignaturePadProps) {
     if (!drawing) return;
     const point = pointFromEvent(event);
     setStrokes((current) => current.map((stroke, index) => index === current.length - 1 ? [...stroke, point] : stroke));
-    onSignedChange(true);
   };
 
   const end = () => setDrawing(false);
