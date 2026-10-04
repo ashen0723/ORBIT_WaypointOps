@@ -62,6 +62,66 @@ module.exports = async ({ db, request, base, tokens }) => {
   const order = created.order,
     lineId = order.lines[0].id;
   await request(`/orders/${order.id}`, undefined, "foreign-store", "GET", 403);
+  const preview = await request(
+    `/orders/${order.id}`,
+    undefined,
+    "dispatcher",
+    "GET",
+  );
+  assert.equal(preview.planningLoad.weightKg, 40);
+  assert.equal(preview.planningLoad.units, 20);
+  const sunday = new Date(days[5]);
+  sunday.setUTCDate(sunday.getUTCDate() + 1);
+  await db.operatingDay.upsert({
+    where: { date: sunday },
+    update: { operating: true },
+    create: { date: sunday, operating: true },
+  });
+  const calendar = await request(
+    `/planning/calendar?from=${days[0]}&to=${sunday.toISOString().slice(0, 10)}&outletId=A&limit=2`,
+    undefined,
+    "dispatcher",
+    "GET",
+  );
+  assert.deepEqual(
+    calendar.items.map((d) => d.date),
+    days.slice(0, 2),
+  );
+  const tail = await request(
+    `/planning/calendar?from=${days[0]}&to=${sunday.toISOString().slice(0, 10)}&outletId=A&cursor=${calendar.nextCursor}`,
+    undefined,
+    "dispatcher",
+    "GET",
+  );
+  assert.deepEqual(
+    tail.items.map((d) => d.date),
+    days.slice(2),
+  );
+  await request(
+    `/planning/calendar?from=${days[0]}&to=${days[5]}`,
+    undefined,
+    "store",
+    "GET",
+    403,
+  );
+  await db.outlet.update({
+    where: { id: "A" },
+    data: { brand: "STYLE", scheduledWeekday: 3 },
+  });
+  const weekly = await request(
+    `/planning/calendar?from=${days[0]}&to=${days[5]}&outletId=A`,
+    undefined,
+    "dispatcher",
+    "GET",
+  );
+  assert.deepEqual(
+    weekly.items.map((d) => d.date),
+    [days[2]],
+  );
+  await db.outlet.update({
+    where: { id: "A" },
+    data: { brand: "FRESH", scheduledWeekday: null },
+  });
   async function allocate(orderId, day) {
     const plan = {
       date: day,
@@ -77,6 +137,18 @@ module.exports = async ({ db, request, base, tokens }) => {
       "POST",
       201,
     );
+    const ownDrafts = await request(
+      "/planning/drafts",
+      undefined,
+      "dispatcher",
+      "GET",
+    );
+    assert.ok(
+      ownDrafts.items.some(
+        (d) => d.id === draft.id && d.allocatedTripId === null,
+      ),
+    );
+    await request("/planning/drafts", undefined, "loader", "GET", 403);
     const { trip } = await request(
       "/planning/allocate",
       mutation({ draftId: draft.id, expectedDraftVersion: draft.version }),
@@ -310,6 +382,20 @@ module.exports = async ({ db, request, base, tokens }) => {
     "dispatcher",
     "GET",
   );
+  const balanceBefore = await request(
+    `/deliveries/${delivery.id}/recovery`,
+    undefined,
+    "dispatcher",
+    "GET",
+  );
+  assert.deepEqual(balanceBefore.lines, [{ orderLineId: lineId, qty: 2 }]);
+  await request(
+    `/deliveries/${delivery.id}/recovery`,
+    undefined,
+    "store",
+    "GET",
+    403,
+  );
   await request(
     `/deliveries/${delivery.id}/recovery`,
     mutation({
@@ -325,6 +411,23 @@ module.exports = async ({ db, request, base, tokens }) => {
     "POST",
     201,
   );
+  const retryPreview = await request(
+    `/orders/${order.id}`,
+    undefined,
+    "dispatcher",
+    "GET",
+  );
+  assert.equal(retryPreview.planningLoad.units, 2);
+  assert.equal(retryPreview.planningLoad.weightKg, 4);
+  const balanceAfter = await request(
+    `/deliveries/${delivery.id}/recovery`,
+    undefined,
+    "dispatcher",
+    "GET",
+  );
+  assert.deepEqual(balanceAfter.lines, [{ orderLineId: lineId, qty: 0 }]);
+  assert.equal(balanceAfter.decisions.length, 1);
+  assert.equal(balanceAfter.decisions[0].decision.action, "REDELIVER");
   let retry = await allocate(order.id, days[1]);
   assert.equal(retry.stops[0].lines[0].plannedQty, 2);
   retry = await depart(await load(retry, 2));

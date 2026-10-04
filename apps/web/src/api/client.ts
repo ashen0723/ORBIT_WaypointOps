@@ -23,19 +23,22 @@ export async function apiFetch<T>(
   init: ApiRequestInit = {},
 ): Promise<T> {
   const { token, headers, ...rest } = init;
+  const requestHeaders = new Headers(headers);
+  if (!requestHeaders.has("Accept"))
+    requestHeaders.set("Accept", "application/json");
+  if (
+    rest.body !== undefined &&
+    !(rest.body instanceof FormData) &&
+    !requestHeaders.has("Content-Type")
+  )
+    requestHeaders.set("Content-Type", "application/json");
+  if (token) requestHeaders.set("Authorization", `Bearer ${token}`);
   const res = await fetch(`${API_BASE}${path}`, {
     ...rest,
-    headers: {
-      Accept: "application/json",
-      ...(rest.body !== undefined && !(rest.body instanceof FormData)
-        ? { "Content-Type": "application/json" }
-        : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...headers,
-    },
+    headers: requestHeaders,
   });
   const text = await res.text();
-  let body: any = null;
+  let body: unknown = null;
   try {
     body = text ? JSON.parse(text) : null;
   } catch {
@@ -46,11 +49,21 @@ export async function apiFetch<T>(
     );
   }
   if (!res.ok) {
+    const error =
+      body && typeof body === "object" && !Array.isArray(body)
+        ? (body as Record<string, unknown>)
+        : {};
+    const message =
+      typeof error.message === "string"
+        ? error.message
+        : Array.isArray(error.message)
+          ? error.message.filter((v) => typeof v === "string").join(" ")
+          : res.statusText;
     throw new ApiError(
       res.status,
-      body?.code ?? "HTTP_ERROR",
-      body?.message ?? res.statusText,
-      body?.details ?? null,
+      typeof error.code === "string" ? error.code : "HTTP_ERROR",
+      message,
+      error.details ?? null,
     );
   }
   return body as T;

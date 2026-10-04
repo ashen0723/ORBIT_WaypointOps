@@ -92,31 +92,49 @@ module.exports = async ({ db, base }) => {
     });
     const dispatcher = pages.dispatcher;
     await dispatcher
-      .getByRole("button", { name: "Refresh", exact: true })
+      .getByRole("link", { name: "Planning Workspace", exact: true })
       .click();
+    await dispatcher
+      .getByLabel("Planning depot", { exact: true })
+      .selectOption("D");
     await dispatcher
       .getByLabel("Vehicle", { exact: true })
       .selectOption("LIVE-V");
     await dispatcher
-      .getByRole("checkbox", { name: new RegExp(order.id) })
-      .check();
-    await dispatcher
-      .getByRole("button", { name: "Validate, save draft & allocate" })
+      .getByRole("button", { name: `Add order ${order.id}`, exact: true })
       .click();
     await dispatcher
-      .getByRole("button", { name: "Publish to loading team" })
+      .getByRole("button", { name: "Save draft", exact: true })
       .click();
     await expect(
-      dispatcher.getByText("Loading checks & shortfalls", { exact: true }),
+      dispatcher.getByText(
+        "Draft saved on the server. It holds no reservations.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await dispatcher
+      .getByRole("button", { name: "Validate plan", exact: true })
+      .click();
+    await expect(
+      dispatcher.getByText("All planning checks passed.", { exact: true }),
+    ).toBeVisible();
+    await dispatcher
+      .getByRole("button", { name: "Allocate trip", exact: true })
+      .click();
+    await dispatcher
+      .getByRole("button", { name: "Publish trip", exact: true })
+      .click();
+    await expect(
+      dispatcher.getByText("Trip published to the loading team.", {
+        exact: true,
+      }),
     ).toBeVisible();
     const loader = pages.loader;
-    const checkPanel = loader
-      .locator("details")
-      .filter({
-        has: loader
-          .locator("summary")
-          .filter({ hasText: /^Loading checks & shortfalls$/ }),
-      });
+    const checkPanel = loader.locator("details").filter({
+      has: loader
+        .locator("summary")
+        .filter({ hasText: /^Loading checks & shortfalls$/ }),
+    });
     const committed = () => expect(checkPanel).not.toHaveAttribute("open", "");
     await loader.getByRole("button", { name: "Refresh", exact: true }).click();
     await loader
@@ -209,6 +227,14 @@ module.exports = async ({ db, base }) => {
       1,
     );
     assert.equal(await db.evidence.count({ where: { orderId: order.id } }), 1);
+    assert.deepEqual(errors, []);
+    await require("./dispatcher-browser.scenarios.cjs")({
+      db,
+      base,
+      url,
+      pages,
+      day,
+    });
     assert.deepEqual(errors, []);
     await driver.screenshot({
       path: "/private/tmp/waypoint-driver-e2e.png",

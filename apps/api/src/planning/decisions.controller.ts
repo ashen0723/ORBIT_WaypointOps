@@ -16,6 +16,8 @@ export class DecisionsController {
   decision(@Req() req: AuthRequest, @Param('id') id: string, @Body() body: unknown) { return this.decisions.decideShortfall(req.user, id, body); }
   @Post('loading/issues/:id/acknowledge') @HttpCode(200) @Roles('LOADER')
   acknowledge(@Req() req: AuthRequest, @Param('id') id: string, @Body() body: unknown) { return this.decisions.acknowledgeIssue(req.user, id, body); }
+  @Get('deliveries/:id/recovery') @Roles('DISPATCHER')
+  recoveryState(@Param('id') id:string){return this.decisions.recoveryState(id);}
   @Post('deliveries/:id/recovery') @Roles('DISPATCHER')
   recovery(@Req() req: AuthRequest, @Param('id') id: string, @Body() body: unknown) { return this.decisions.recover(req.user, id, body); }
   @Post('planning/defer') @HttpCode(200) @Roles('DISPATCHER')

@@ -50,7 +50,7 @@ export type ValidatePlanResponse =
 export interface SaveDraftRequest extends Mutation { plan: PlanInput }
 export interface UpdateDraftRequest extends VersionedMutation { plan: PlanInput }
 /** A draft is NOT a Trip and holds no orders, trip slots or fuel reservations. */
-export interface PlanDraftView { id: Id; version: number; plan: PlanInput; updatedAt: Instant }
+export interface PlanDraftView { id: Id; version: number; plan: PlanInput; updatedAt: Instant; allocatedTripId: Id | null }
 export interface AllocatePlanRequest extends Mutation {
   draftId: Id;
   expectedDraftVersion: number;

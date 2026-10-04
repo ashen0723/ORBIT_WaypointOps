@@ -52,8 +52,15 @@ export class PlanningService {
   async audit(tx: Tx, actor: Actor, entityType: string, entityId: string, action: string, payload: unknown, reason?: string) {
     await tx.auditEvent.create({ data: { actorId: actor.id, entityType, entityId, action, payload: json(payload), reason } });
   }
-  private draftView(d: { id: string; version: number; plan: Prisma.JsonValue; updatedAt: Date }): PlanDraftView {
-    return { id: d.id, version: d.version, plan: planInput(d.plan), updatedAt: d.updatedAt.toISOString() };
+  private draftView(d: { id: string; version: number; plan: Prisma.JsonValue; updatedAt: Date; allocatedTripId: string | null }): PlanDraftView {
+    return { id: d.id, version: d.version, plan: planInput(d.plan), updatedAt: d.updatedAt.toISOString(), allocatedTripId: d.allocatedTripId };
+  }
+  async listDrafts(actor: Actor, query: Record<string, unknown>) {
+    const limit=query.limit===undefined?50:Number(query.limit);
+    if(!Number.isInteger(limit)||limit<1||limit>100) fail(400,'INVALID_INPUT','limit must be 1 to 100.');
+    const cursor=query.cursor===undefined?undefined:text(query.cursor,'cursor');
+    const rows=await this.db.planDraft.findMany({where:{createdById:actor.id,...(cursor?{id:{gt:cursor}}:{})},orderBy:{id:'asc'},take:limit+1});
+    return {items:rows.slice(0,limit).map(d=>this.draftView(d)),nextCursor:rows.length>limit?rows[limit-1].id:null};
   }
   async saveDraft(actor: Actor, input: unknown) {
     const body = object(input), plan = planInput(body.plan);

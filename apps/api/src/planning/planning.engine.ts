@@ -25,7 +25,7 @@ export function evaluatePlan(plan: PlanInput, data: PlanningData, replacingTripI
   const invalidReference = (message: string, id: string | null = null) => { calculable = false; add('REFERENCE_DATA_MISSING', message, id); };
   if (!vehicle) invalidReference('Vehicle does not exist.', plan.vehicleId);
   if (!data.operatingDay) invalidReference('Operating calendar entry is missing.', plan.date);
-  else if (!data.operatingDay.operating) add('NON_OPERATING_DATE', 'Selected date is not operating.', plan.date, 'date');
+  else if (!data.operatingDay.operating || new Date(plan.date).getUTCDay()===0) add('NON_OPERATING_DATE', 'Selected date is not operating.', plan.date, 'date');
   if (vehicle) {
     if (!vehicle.available || data.availability?.available === false) add('VEHICLE_UNAVAILABLE', 'Vehicle is unavailable on this date.', vehicle.id);
     if (vehicle.depotId !== plan.depotId) add('DEPOT_MISMATCH', 'Vehicle belongs to another depot.', vehicle.id);
@@ -43,6 +43,10 @@ export function evaluatePlan(plan: PlanInput, data: PlanningData, replacingTripI
     if ((!own && !['CONFIRMED', 'DEFERRED'].includes(order.status)) || (order.recoveryPending && order.pendingQuantities === null && !own)) add('ORDER_NOT_ELIGIBLE', 'Order is not available for initial allocation; unresolved recovery must be reconciled first.', order.id);
     const earliest = order.deferredToDate ?? order.plannedDate ?? order.requestedDate;
     if (plan.date < earliest.toISOString().slice(0, 10)) add('ORDER_NOT_ELIGIBLE', 'Cannot allocate before the eligible delivery date.', order.id);
+    if(order.outlet.brand==='STYLE'){
+      if(!order.outlet.scheduledWeekday)invalidReference('Style outlet weekly delivery day is not configured.',order.outletId);
+      else if(new Date(plan.date).getUTCDay()!==order.outlet.scheduledWeekday)add('NON_OPERATING_DATE','Choose this Style outlet’s configured weekly delivery day.',order.id,'date');
+    }
     if (order.outlet.depotId !== plan.depotId) add('DEPOT_MISMATCH', 'Outlet belongs to another depot.', order.id);
     if (vehicle && order.temp !== 'AMBIENT' && vehicle.temp !== 'REEFER') add('REEFER_REQUIRED', 'Chilled/frozen orders require a reefer.', order.id);
     if (vehicle && order.outlet.parkingConstraint === 'VAN_ONLY' && vehicle.type !== 'VAN') add('VAN_REQUIRED', 'Outlet requires a van.', order.id);
