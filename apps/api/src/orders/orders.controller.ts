@@ -1,18 +1,45 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
-import { OrdersService } from './orders.service';
-import { OrderPolicyService } from './order-policy.service';
-import { JwtAuthGuard, StoreManagerGuard } from '../auth/auth.guard';
-import { CurrentUser, RequestUser } from '../auth/request-user';
-@Controller('orders')
-@UseGuards(JwtAuthGuard)
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from "@nestjs/common";
+import { AuthGuard, Roles, type AuthRequest } from "../auth/auth.guard";
+import { ConnectedOrdersService } from "../workflow/orders.service";
+import { OrderPolicyService } from "./order-policy.service";
+@Controller("orders")
+@UseGuards(AuthGuard)
 export class OrdersController {
-  constructor(private readonly orders: OrdersService, private readonly policy: OrderPolicyService) {}
-  @Get() list(@CurrentUser() user: RequestUser, @Query() query: Record<string, unknown>) { return this.orders.list(user, query); }
-  @Get('catalog') @UseGuards(StoreManagerGuard)
-  catalog(@CurrentUser() user: RequestUser) { return this.orders.catalog(user); }
-  @Get('policy') @UseGuards(StoreManagerGuard)
-  policyInfo() { return this.policy.scheduling(); }
-  @Get(':id') findOne(@CurrentUser() user: RequestUser, @Param('id') id: string) { return this.orders.findOne(user, id); }
-  @Post() @UseGuards(StoreManagerGuard)
-  create(@CurrentUser() user: RequestUser, @Body() body: unknown) { return this.orders.create(user, body); }
+  constructor(
+    private readonly orders: ConnectedOrdersService,
+    private readonly policy: OrderPolicyService,
+  ) {}
+  @Get()
+  @Roles("STORE_MANAGER", "DISPATCHER")
+  list(@Req() r: AuthRequest, @Query() q: Record<string, unknown>) {
+    return this.orders.orders(r.user, q);
+  }
+  @Get("catalog")
+  @Roles("STORE_MANAGER")
+  catalog(@Req() r: AuthRequest, @Query() q: Record<string, unknown>) {
+    return this.orders.catalog(r.user, q);
+  }
+  @Get("policy")
+  @Roles("STORE_MANAGER")
+  policyInfo(@Req() r: AuthRequest, @Query() q: Record<string, unknown>) {
+    return this.policy.scheduling(r.user, q);
+  }
+  @Get(":id")
+  findOne(@Req() r: AuthRequest, @Param("id") id: string) {
+    return this.orders.get(r.user, id);
+  }
+  @Post()
+  @Roles("STORE_MANAGER")
+  create(@Req() r: AuthRequest, @Body() b: unknown) {
+    return this.orders.create(r.user, b);
+  }
 }

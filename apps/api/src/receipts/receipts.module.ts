@@ -1,7 +1,9 @@
-import { Module } from '@nestjs/common';
-import { OrdersModule } from '../orders/orders.module';
-import { ReceiptsController } from './receipts.controller';
-import { ReceiptsService } from './receipts.service';
-import { ReceiptEvidenceService } from './receipt-evidence.service';
-@Module({ imports: [OrdersModule], controllers: [ReceiptsController], providers: [ReceiptsService, ReceiptEvidenceService], exports: [ReceiptsService] })
+import { Module } from "@nestjs/common";
+import { AuthModule } from "../auth/auth.module";
+import { WorkflowModule } from "../workflow/workflow.module";
+import { ReceiptsController } from "./receipts.controller";
+@Module({
+  imports: [AuthModule, WorkflowModule],
+  controllers: [ReceiptsController],
+})
 export class ReceiptsModule {}

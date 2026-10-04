@@ -1,20 +1,24 @@
-import { Global, Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
-import { AuthController } from './auth.controller';
-import { AuthService } from './auth.service';
-import { JwtAuthGuard, StoreManagerGuard } from './auth.guard';
-
-@Global()
+import { Module } from "@nestjs/common";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import { JwtModule } from "@nestjs/jwt";
+import { AuthController } from "./auth.controller";
+import { AuthService } from "./auth.service";
+import { UsersModule } from "../users/users.module";
+import { AuthGuard } from "./auth.guard";
+import { JwtAuthGuard } from "./jwt-auth.guard";
+import { RolesGuard } from "./roles.guard";
+import { jwtOptions } from "./jwt.config";
 @Module({
-  imports: [JwtModule.registerAsync({ useFactory: () => {
-    const secret = process.env.JWT_SECRET;
-    if (!secret || (process.env.NODE_ENV === 'production' && (secret.length < 32 || secret === 'replace-with-a-long-random-value'))) {
-      throw new Error('Set JWT_SECRET in the root .env (at least 32 characters in production).');
-    }
-    return { secret };
-  } })],
+  imports: [
+    UsersModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: jwtOptions,
+    }),
+  ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard, StoreManagerGuard],
-  exports: [AuthService, JwtAuthGuard, StoreManagerGuard, JwtModule],
+  providers: [AuthService, AuthGuard, JwtAuthGuard, RolesGuard],
+  exports: [AuthService, AuthGuard, JwtAuthGuard, RolesGuard],
 })
 export class AuthModule {}

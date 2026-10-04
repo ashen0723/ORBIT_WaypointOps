@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 
 const DELIVERY_LOGO = "/Blue_Simple_Delivery_Truck_Logo.png";
