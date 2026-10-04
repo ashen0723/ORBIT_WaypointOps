@@ -145,6 +145,16 @@ export interface LoadingIssueDto {
   createdAt: string;
 }
 
+export interface AcknowledgeLoadingIssueDto {
+  issueId: string;
+  tripId: string;
+  status: string;
+  decision: string | null;
+  acknowledgedById: string | null;
+  acknowledgedAt: string;
+  alreadyAcknowledged: boolean;
+}
+
 export async function fetchLoaderTrips(
   token: string,
   signal?: AbortSignal,
@@ -203,6 +213,19 @@ export function createLoadingIssue(
       method: 'POST',
       token,
       body: JSON.stringify(body),
+    },
+  );
+}
+
+export function acknowledgeLoadingIssue(
+  token: string,
+  issueId: string,
+): Promise<AcknowledgeLoadingIssueDto> {
+  return apiFetch<AcknowledgeLoadingIssueDto>(
+    `/loading/issues/${encodeURIComponent(issueId)}/acknowledge`,
+    {
+      method: 'POST',
+      token,
     },
   );
 }
@@ -296,6 +319,7 @@ export function mapLoaderTripDetail(
     if (!target) return [];
 
     return [[issue.orderLineId, {
+      issueId: issue.issueId,
       tripId: detail.tripId,
       orderLineId: issue.orderLineId,
       orderId: target.order.id,

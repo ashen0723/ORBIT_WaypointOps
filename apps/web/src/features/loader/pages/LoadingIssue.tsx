@@ -66,6 +66,7 @@ export function LoadingIssue() {
     reportIssue,
     recordReplacement,
     reportDamagedIssue,
+    acknowledgeDecision,
     issueSavingItemId,
     issueErrors,
   } = useLoader();
@@ -204,6 +205,20 @@ export function LoadingIssue() {
           returnPath
         }
         trip={trip}
+        acknowledging={
+          issueSavingItemId ===
+          existingIssue.itemId
+        }
+        acknowledgementError={
+          issueErrors[
+          existingIssue.itemId
+          ]
+        }
+        onAcknowledge={() => {
+          void acknowledgeDecision(
+            existingIssue.itemId,
+          );
+        }}
       />
     );
   }
@@ -843,6 +858,9 @@ function ExistingIssueView({
   issue,
   returnPath,
   trip,
+  acknowledging,
+  acknowledgementError,
+  onAcknowledge,
 }: {
   issue: ReturnType<
     typeof issueIdentity
@@ -861,6 +879,9 @@ function ExistingIssueView({
       planVersion?: number;
     };
   };
+  acknowledging: boolean;
+  acknowledgementError?: string;
+  onAcknowledge: () => void;
 }) {
   const locallyReplaced =
     issue.resolution ===
@@ -874,6 +895,11 @@ function ExistingIssueView({
   const shipShort =
     issue.resolution ===
     'ship_short';
+
+  const requiresAcknowledgement =
+    !waiting &&
+    !locallyReplaced &&
+    !issue.decisionReceived;
 
   const approvedQuantity =
     issue.approvedShipQuantity ??
@@ -1056,6 +1082,24 @@ function ExistingIssueView({
             </div>
           )}
 
+          {issue.dispatcherDecision && (
+            <div className="mt-5 rounded-card border border-brand/25 bg-brand-pale/50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-forest">
+                Dispatcher decision
+              </p>
+
+              <p className="mt-2 text-sm font-medium leading-6 text-ink">
+                {issue.dispatcherDecision}
+              </p>
+            </div>
+          )}
+
+          {acknowledgementError && (
+            <p className="mt-5 rounded-card border border-danger/20 bg-danger-pale px-4 py-3 text-sm font-medium text-danger-ink">
+              {acknowledgementError}
+            </p>
+          )}
+
           <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Link
               to="/issues"
@@ -1067,21 +1111,38 @@ function ExistingIssueView({
               View all issues
             </Link>
 
-            <Link
-              to={
-                returnPath
-              }
-              className={buttonStyles(
-                waiting
-                  ? 'secondary'
-                  : 'primary',
-                'lg',
-              )}
-            >
-              {waiting
-                ? 'Continue Other Loading'
-                : 'Continue Loading'}
-            </Link>
+            {requiresAcknowledgement ? (
+              <Button
+                size="lg"
+                disabled={acknowledging}
+                onClick={onAcknowledge}
+              >
+                <CheckCircle2Icon
+                  aria-hidden="true"
+                  className="h-4 w-4"
+                />
+
+                {acknowledging
+                  ? 'Saving…'
+                  : 'Acknowledge Decision'}
+              </Button>
+            ) : (
+              <Link
+                to={
+                  returnPath
+                }
+                className={buttonStyles(
+                  waiting
+                    ? 'secondary'
+                    : 'primary',
+                  'lg',
+                )}
+              >
+                {waiting
+                  ? 'Continue Other Loading'
+                  : 'Continue Loading'}
+              </Link>
+            )}
           </div>
         </div>
       </Card>
@@ -1119,6 +1180,7 @@ function issueIdentity(
     approvedShipQuantity?: number;
     cancelledQuantity?: number;
     cancellationReason?: string;
+    dispatcherDecision?: string;
   },
 ) {
   return issue;

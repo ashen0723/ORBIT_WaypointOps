@@ -18,6 +18,7 @@ import type {
 } from '../types/loader';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import {
+  acknowledgeLoadingIssue,
   createLoadingIssue,
   fetchLoaderTrip,
   fetchLoaderTrips,
@@ -107,7 +108,7 @@ interface LoaderContextValue {
 
   acknowledgeDecision: (
     itemId: string,
-  ) => void;
+  ) => Promise<void>;
 
   acknowledgePlanUpdate: (
     id: string,
@@ -402,6 +403,47 @@ export function LoaderProvider({
     );
   }, [persistIssue, quantities]);
 
+  const acknowledgeDecision = useCallback(async (itemId: string) => {
+    const issue = issues[itemId];
+
+    if (!token) {
+      setIssueErrors((current) => ({
+        ...current,
+        [itemId]: 'Sign in to acknowledge this decision.',
+      }));
+      return;
+    }
+
+    if (!issue?.issueId || !issue.tripId) {
+      setIssueErrors((current) => ({
+        ...current,
+        [itemId]: 'This issue is missing its backend reference.',
+      }));
+      return;
+    }
+
+    setIssueSavingItemId(itemId);
+    setIssueErrors((current) => {
+      const next = { ...current };
+      delete next[itemId];
+      return next;
+    });
+
+    try {
+      await acknowledgeLoadingIssue(token, issue.issueId);
+      await loadTrip(issue.tripId);
+    } catch (error) {
+      setIssueErrors((current) => ({
+        ...current,
+        [itemId]: error instanceof Error
+          ? error.message
+          : 'Could not acknowledge this decision.',
+      }));
+    } finally {
+      setIssueSavingItemId((current) => current === itemId ? null : current);
+    }
+  }, [issues, loadTrip, token]);
+
   const value =
     useMemo<LoaderContextValue>(
       () => ({
@@ -503,31 +545,7 @@ export function LoaderProvider({
 
         reportDamagedIssue,
 
-        acknowledgeDecision: (
-          itemId,
-        ) => {
-          setIssues(
-            (current) => {
-              const issue =
-                current[itemId];
-
-              if (!issue) {
-                return current;
-              }
-
-              return {
-                ...current,
-
-                [itemId]: {
-                  ...issue,
-
-                  decisionReceived:
-                    true,
-                },
-              };
-            },
-          );
-        },
+        acknowledgeDecision,
 
         acknowledgePlanUpdate: (
           id,
@@ -598,6 +616,7 @@ export function LoaderProvider({
         reportIssue,
         recordReplacement,
         reportDamagedIssue,
+        acknowledgeDecision,
         tripDataById,
       ],
     );

@@ -141,6 +141,8 @@ export interface LoaderIssueTarget {
 }
 
 export interface LoaderIssue extends LoaderIssueTarget {
+  issueId?: string;
+
   /**
    * Temporary compatibility field used by the existing Loader UI.
    */

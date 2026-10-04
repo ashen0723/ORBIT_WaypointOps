@@ -87,6 +87,7 @@ describe('mapLoaderTripDetail', () => {
     });
     expect(mapped.quantities).toEqual({ 'LINE-1': 16 });
     expect(mapped.issues['LINE-1']).toMatchObject({
+      issueId: 'ISSUE-1',
       resolution: 'ship_short', decisionReceived: true,
       approvedShipQuantity: 16, cancelledQuantity: 4,
     });
