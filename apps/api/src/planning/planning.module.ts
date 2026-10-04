@@ -1,10 +1,6 @@
 import { Module } from '@nestjs/common';
-import { PlanningController } from './planning.controller';
+import { PlanningController, PlanningTripsController } from './planning.controller';
 import { PlanningService } from './planning.service';
-
-@Module({
-  controllers: [PlanningController],
-  providers: [PlanningService],
-  exports: [PlanningService],
-})
+import { AuthModule } from '../auth/auth.module';
+@Module({ imports: [AuthModule], controllers: [PlanningController, PlanningTripsController], providers: [PlanningService], exports: [PlanningService] })
 export class PlanningModule {}

@@ -17,6 +17,7 @@ Prerequisites: Docker Desktop 4.x (Compose v2) and Git.
 
 ```bash
 cp .env.example .env
+# Set JWT_SECRET in .env to a random secret of at least 32 characters before API login.
 docker compose up --build
 ```
 
@@ -38,6 +39,9 @@ Password for every account: `waypoint-demo` (set by `SEED_DEMO_PASSWORD`).
 | Store Manager | `store@waypoint.lk` | `/store` |
 | Store Manager (2nd outlet, permission checks) | `store2@waypoint.lk` | `/store` |
 
+The browser still uses prototype sessions/data; the backend now has JWT login and planning endpoints.
+See [Planning backend](docs/planning-backend.md) for API setup and its current scope.
+
 Sessions are per browser tab: open one tab per role to follow an order across roles.
 
 ## Local development (without building images)
@@ -46,6 +50,7 @@ Requires Node.js 22+ and Docker (for the database only).
 
 ```bash
 cp .env.example .env
+# Set JWT_SECRET in .env to a random secret of at least 32 characters before API login.
 npm install
 docker compose up -d db
 npm run db:deploy -w apps/api
@@ -59,6 +64,7 @@ npm run dev:web
   and `start:dev`; run `npx prisma generate` in `apps/api` after editing the schema in an already-running session.
 - Schema changes: `cd apps/api && npx prisma migrate dev --name <change>` after editing `prisma/schema.prisma`.
 - Tests: `npm test` (web: Vitest, api: Jest).
+- Database/API integration: `npm run test:integration -w apps/api` (disposable embedded PostgreSQL; localhost ports required).
 - Shared contract checks: `npm run typecheck -w packages/contracts`.
 
 > **npm 11 note:** npm 11 skips package install scripts unless approved. If `prisma` or `bcrypt` misbehave
@@ -117,7 +123,7 @@ _To be completed by module owners._ Merge-level changes are in [docs/merge-notes
 ## Documentation
 
 - [API and workflow contract v1](docs/api-contract-v1.md) — agreed rules, shared DTOs, endpoint ownership,
-  and required schema changes; endpoints remain implementation work.
+  and endpoint ownership. [Planning backend](docs/planning-backend.md) tracks implemented routes and remaining handoffs.
 - [Architecture](docs/architecture.md)
 - [Data model](docs/data-model.md)
 - [AI tool disclosure](docs/ai-disclosure.md)

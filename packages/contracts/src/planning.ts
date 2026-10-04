@@ -5,7 +5,7 @@ export type PlanningFailureCode =
   | 'REEFER_REQUIRED' | 'VAN_REQUIRED' | 'WINDOW_CONFLICT' | 'FRESH_DEADLINE'
   | 'FUEL_QUOTA_EXCEEDED' | 'TRIP_LIMIT' | 'VEHICLE_CONFLICT'
   | 'DUPLICATE_ASSIGNMENT' | 'VEHICLE_UNAVAILABLE' | 'NON_OPERATING_DATE'
-  | 'ORDER_NOT_ELIGIBLE' | 'DRIVER_NOT_CONFIGURED' | 'INVALID_SEQUENCE';
+  | 'REFERENCE_DATA_MISSING' | 'ORDER_NOT_ELIGIBLE' | 'DRIVER_NOT_CONFIGURED' | 'INVALID_SEQUENCE';
 export interface PlanningReason extends ErrorDetail { code: PlanningFailureCode }
 export interface PlanningTotals {
   weightKg: number;
