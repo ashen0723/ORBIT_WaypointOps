@@ -61,6 +61,18 @@ const outlets = [
     windowCloseTime: "10:00",
   },
   {
+    // Demo: chilled FRESH outlet reachable only by van (refrigerated van required).
+    id: "OUT-003",
+    name: "FreshMart – Pettah Market",
+    brand: Brand.FRESH,
+    district: "Colombo",
+    depotId: "DEP-PLG",
+    dockType: DockType.STREET,
+    parkingConstraint: ParkingConstraint.VAN_ONLY,
+    windowOpenTime: "04:00",
+    windowCloseTime: "10:00",
+  },
+  {
     id: "OUT-005",
     name: "City Style – Colombo 02",
     brand: Brand.STYLE,
@@ -111,6 +123,19 @@ const vehicles = [
   },
   {
     id: "VAN-012",
+    type: VehicleType.VAN,
+    temp: VehicleTemp.REEFER,
+    weightCapKg: 600,
+    volumeCapM3: 8,
+    fuelType: "diesel",
+    kmPerL: 100 / 11,
+    weeklyFuelQuotaL: 150,
+    depotId: "DEP-PLG",
+    available: true,
+  },
+  {
+    // Demo: second refrigerated van so a van that becomes unavailable can be replaced.
+    id: "VAN-015",
     type: VehicleType.VAN,
     temp: VehicleTemp.REEFER,
     weightCapKg: 600,
@@ -215,6 +240,23 @@ const users = [
     vehicleId: "TRK-021",
   },
   {
+    // Allocation requires exactly one active driver per vehicle.
+    id: "USR-DRV2",
+    email: "driver2@waypoint.lk",
+    name: "Kasun Bandara",
+    role: Role.DRIVER,
+    depotId: "DEP-PLG",
+    vehicleId: "VAN-012",
+  },
+  {
+    id: "USR-DRV3",
+    email: "driver3@waypoint.lk",
+    name: "Ruwan Dissanayake",
+    role: Role.DRIVER,
+    depotId: "DEP-PLG",
+    vehicleId: "VAN-015",
+  },
+  {
     id: "USR-STR",
     email: "store@waypoint.lk",
     name: "Sanduni Perera",
@@ -228,6 +270,24 @@ const users = [
     role: Role.STORE_MANAGER,
     outletId: "OUT-002",
   },
+  {
+    id: "USR-STR3",
+    email: "store3@waypoint.lk",
+    name: "Dilani Wickramasinghe",
+    role: Role.STORE_MANAGER,
+    outletId: "OUT-003",
+  },
+];
+
+// Fictional base catalog so Store Managers can order on a fresh Docker database.
+const catalog = [
+  { id: "CAT-FRESH-MILK", brand: Brand.FRESH, name: "Fresh milk 1L (12 pack)", unit: "crate", temp: TempRequirement.CHILLED, unitWeightKg: 12.5, unitVolumeM3: 0.02 },
+  { id: "CAT-FRESH-YOGURT", brand: Brand.FRESH, name: "Set yoghurt 80g (48 pack)", unit: "crate", temp: TempRequirement.CHILLED, unitWeightKg: 4.5, unitVolumeM3: 0.015 },
+  { id: "CAT-FRESH-CHICKEN", brand: Brand.FRESH, name: "Chicken breast 1kg (10 pack)", unit: "case", temp: TempRequirement.CHILLED, unitWeightKg: 10.5, unitVolumeM3: 0.018 },
+  { id: "CAT-FRESH-RICE", brand: Brand.FRESH, name: "Samba rice 5kg (4 pack)", unit: "case", temp: TempRequirement.AMBIENT, unitWeightKg: 20.4, unitVolumeM3: 0.03 },
+  { id: "CAT-FRESH-BREAD", brand: Brand.FRESH, name: "Sandwich bread (20 loaves)", unit: "crate", temp: TempRequirement.AMBIENT, unitWeightKg: 9, unitVolumeM3: 0.06 },
+  { id: "CAT-STYLE-SHIRTS", brand: Brand.STYLE, name: "Cotton shirts (24 pack)", unit: "carton", temp: TempRequirement.AMBIENT, unitWeightKg: 7, unitVolumeM3: 0.05 },
+  { id: "CAT-TECH-PHONES", brand: Brand.TECH, name: "Smartphones (10 pack)", unit: "carton", temp: TempRequirement.AMBIENT, unitWeightKg: 3, unitVolumeM3: 0.02 },
 ];
 
 async function main(): Promise<void> {
@@ -254,6 +314,10 @@ async function main(): Promise<void> {
       update: {},
       create: { ...u, passwordHash },
     });
+  }
+
+  for (const item of catalog) {
+    await prisma.catalogItem.upsert({ where: { id: item.id }, update: {}, create: item });
   }
 
   // Email-based upsert may find an account whose ID differs from the demo ID.
@@ -309,7 +373,7 @@ async function main(): Promise<void> {
 
     const happyAt = (time: string) => new Date(`2026-10-05T${time}+05:30`);
     const source = "Fictional shared workflow fixture";
-    for (const outletId of ["OUT-001", "OUT-002"]) {
+    for (const outletId of ["OUT-001", "OUT-002", "OUT-003"]) {
       await tx.outletHandling.upsert({
         where: { outletId },
         update: {},
@@ -701,6 +765,33 @@ async function main(): Promise<void> {
       });
     }
   });
+
+  // Rolling operating calendar (Mon–Sat) from today, so a fresh stack can plan on any demo day.
+  const today = new Date(new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10));
+  for (let i = -1; i < 90; i++) {
+    const day = new Date(today);
+    day.setUTCDate(day.getUTCDate() + i);
+    await prisma.operatingDay.upsert({
+      where: { date: day },
+      update: {},
+      create: { date: day, operating: day.getUTCDay() !== 0 },
+    });
+  }
+  // Fictional legs between the Peliyagoda outlets so multi-stop plans can be timed.
+  const source = "Fictional shared workflow fixture";
+  for (const [a, b, distanceKm, durationMin] of [
+    ["OUT-001", "OUT-002", 5, 10],
+    ["OUT-001", "OUT-003", 6, 12],
+    ["OUT-002", "OUT-003", 7, 14],
+  ] as const) {
+    for (const [fromKey, toKey] of [[`outlet:${a}`, `outlet:${b}`], [`outlet:${b}`, `outlet:${a}`]]) {
+      await prisma.travelLeg.upsert({
+        where: { fromKey_toKey: { fromKey, toKey } },
+        update: {},
+        create: { fromKey, toKey, distanceKm, durationMin, source },
+      });
+    }
+  }
 
   console.log(
     "Shared workflow fixtures seeded (happy path, loading shortfall, deferral, sync and global calendar).",

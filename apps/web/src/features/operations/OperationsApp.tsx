@@ -41,6 +41,9 @@ const today = () =>
     day: "2-digit",
   }).format(new Date());
 const uid = () => crypto.randomUUID();
+/** Colombo local time with date, e.g. "05 Oct, 06:52". */
+const clock = (instant: string) =>
+  new Date(instant).toLocaleString("en-GB", { timeZone: "Asia/Colombo", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
 const value = (f: FormData, name: string) => String(f.get(name) ?? "");
 const number = (f: FormData, name: string) => Number(value(f, name));
 export function Field({
@@ -1143,7 +1146,8 @@ function OrderHistory({
             }
           />
           <p>
-            Attempt {d.capturedAt} ·{" "}
+            {d.arrivedAt ? `Arrived ${clock(d.arrivedAt)} · ` : ""}Delivered {clock(d.capturedAt)}
+            {d.outcome !== "FAILED" ? ` · received by ${d.recorded.proof.recipientName}` : ""} ·{" "}
             {d.recorded.lines
               .map(
                 (l) =>

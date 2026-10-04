@@ -1,19 +1,14 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { LOGIN_PATH } from "@waypoint/contracts";
-import { AuthProvider, useAuth } from "./providers/AuthProvider";
-import { RoleRouter, type RoleModules } from "./RoleRouter";
-import { Login } from "./pages/Login";
-import { Landing } from "./pages/Landing";
-import { DispatcherApp } from "../features/dispatcher/live/DispatcherApp";
-import { App as LoaderApp } from "../features/loader/App";
-import { OperationsApp } from "../features/operations/OperationsApp";
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { LOGIN_PATH } from '@waypoint/contracts';
+import { AuthProvider, useAuth } from './providers/AuthProvider';
+import { RoleRouter, type RoleModules } from './RoleRouter';
+import { Login } from '../features/dispatcher/pages/Login';
+import { DispatcherApp } from '../features/dispatcher/live/DispatcherApp';
+import { App as LoaderApp } from '../features/loader/App';
+import { OperationsApp } from '../features/operations/OperationsApp';
+import { LiveDriverApp } from '../features/driver/LiveDriverApp';
 
-const ROLE_MODULES: RoleModules = {
-  dispatcher: DispatcherApp,
-  store_manager: OperationsApp,
-  loader: LoaderApp,
-  driver: OperationsApp,
-};
+const ROLE_MODULES: RoleModules = { dispatcher: DispatcherApp, store_manager: OperationsApp, loader: LoaderApp, driver: LiveDriverApp };
 
 const PUBLIC_TREE = (
   <BrowserRouter>

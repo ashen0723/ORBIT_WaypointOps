@@ -18,6 +18,8 @@ export interface PendingAction {
   }[];
   status: "PENDING_SYNC" | "SYNCED" | "CONFLICT" | "FAILED";
   message?: string;
+  /** Sync attempts sent to the server for this entry (uploads + action). */
+  attempts?: number;
 }
 const database = () =>
   new Promise<IDBDatabase>((resolve, reject) => {
@@ -62,6 +64,26 @@ export const saveTrips = (actorId: string, trips: TripView[]) =>
   write("cache", trips, actorId);
 export const cachedTrips = async (actorId: string) =>
   (await read<TripView[] | undefined>("cache", actorId)) ?? [];
+/** Generic per-key cache for route reference data (order lines, driver profile). */
+export const saveCached = (key: string, value: unknown) =>
+  write("cache", value, key);
+export const readCached = <T>(key: string) =>
+  read<T | undefined>("cache", key);
+/** Delete one queue entry; only for server-confirmed or reviewed actions. */
+export async function removeAction(id: string) {
+  const db = await database();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction("queue", "readwrite");
+      tx.objectStore("queue").delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } finally {
+    db.close();
+  }
+}
 export const pendingActions = async (actorId: string) =>
   (await read<PendingAction[]>("queue"))
     .filter((q) => q.actorId === actorId)
@@ -82,6 +104,7 @@ export function flushQueue(actorId: string, token: string): Promise<void> {
         continue;
       }
       if (entry.status !== "PENDING_SYNC" || blocked.has(target)) continue;
+      entry.attempts = (entry.attempts ?? 0) + 1;
       try {
         for (const [i, a] of entry.attachments.entries())
           if (!a.evidenceId) {
@@ -113,6 +136,10 @@ export function flushQueue(actorId: string, token: string): Promise<void> {
             if (signature) d.proof.signatureRef = signature;
           }
         }
+        if (action.kind === "ISSUE")
+          action.request.photoRefs = entry.attachments
+            .filter((a) => a.slot === "photo")
+            .map((a) => a.evidenceId!);
         const { results } = await apiFetch<SyncActionsResponse>(
           "/sync/actions",
           {
@@ -138,6 +165,15 @@ export function flushQueue(actorId: string, token: string): Promise<void> {
       } catch (e) {
         entry.message =
           e instanceof Error ? e.message : "Waiting for connection";
+        // A 4xx (e.g. rejected evidence bytes) will fail identically on every retry: keep the entry, mark it
+        // FAILED so the driver sees it and can retry deliberately, and block later actions for the same target.
+        const status = (e as { status?: number }).status;
+        if (status && status >= 400 && status < 500 && status !== 408 && status !== 429) {
+          entry.status = "FAILED";
+          await enqueue(entry);
+          blocked.add(target);
+          continue;
+        }
         await enqueue(entry);
         throw e;
       }

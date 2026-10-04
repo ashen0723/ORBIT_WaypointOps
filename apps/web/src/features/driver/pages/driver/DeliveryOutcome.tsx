@@ -37,7 +37,7 @@ export function DeliveryOutcome() {
   if (resolved && !complete && !busy) return <Navigate to={`/trips/${trip.id}/stops/${stop.sequence}`} replace />;
 
   const deliveredQuantities = Object.fromEntries(stop.items.map((item) => [item.id, outcome === 'failed' ? 0 : outcome === 'full' ? item.planned : quantities[item.id] ?? item.loaded ?? item.planned]));
-  const photoRequired = false;
+  const photoRequired = outcome === 'failed' || (outcome === 'partial' && /damage/i.test(reason));
   const draft: DeliveryDraft = { outcome, quantities: deliveredQuantities, reason: outcome === 'full' ? undefined : reason, recipient: outcome === 'failed' ? undefined : recipient, signature: outcome === 'failed' ? undefined : signature, photos };
   const invalid = validateDelivery(stop.items, draft);
   const canComplete = !invalid && existingRecord.status === 'Arrived';
@@ -50,7 +50,7 @@ export function DeliveryOutcome() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save delivery.'); }
     finally { submitting.current = false; setBusy(false); }
   };
-  if (complete) return <div className="space-y-4"><StateBanner tone="success" title="Delivery recorded" detail={savedState === 'Demo only' ? 'Demo only — held in memory. No server submission or durable save.' : savedState} /><Button fullWidth onClick={() => navigate(`/trips/${trip.id}/stops`)}>Continue route</Button></div>;
+  if (complete) return <div className="space-y-4"><StateBanner tone="success" title="Delivery recorded" detail={savedState === 'Demo only' ? 'Demo only — held in memory. No server submission or durable save.' : existingRecord.syncState ?? savedState} /><Button fullWidth onClick={() => navigate(`/trips/${trip.id}/stops`)}>Continue route</Button></div>;
 
   return (
     <div className="space-y-5">

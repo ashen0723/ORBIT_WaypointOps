@@ -44,7 +44,7 @@ export function DriverShell() {
             <span className="hidden items-center gap-1.5 whitespace-nowrap rounded-full bg-forest px-4 py-2 text-sm text-white shadow-card md:inline-flex">
               <span className="font-semibold">Driver</span>
               <span aria-hidden>·</span>
-              <span>Kandy fleet</span>
+              <span>{DRIVER.depot || "Waypoint"} fleet</span>
             </span>
 
             <div className="ml-auto flex shrink-0 items-center gap-1.5 md:gap-3">

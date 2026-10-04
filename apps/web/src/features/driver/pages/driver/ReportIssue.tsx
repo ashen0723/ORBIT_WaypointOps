@@ -17,7 +17,7 @@ const ISSUES = [
 
 export function ReportIssue() {
   const location = useLocation();
-  const { trips, connection, fileIssueReport } = useDriver();
+  const { trips, departedTrips, connection, fileIssueReport } = useDriver();
   const offline = connection === 'offline' || new URLSearchParams(location.search).get('offline') === '1';
   const [issue, setIssue] = useState('');
   const [stop, setStop] = useState('');
@@ -27,7 +27,8 @@ export function ReportIssue() {
   const [savedState, setSavedState] = useState('');
   const [photos, setPhotos] = useState<DriverPhoto[]>([]);
   const [sent, setSent] = useState(false);
-  const available = trips.flatMap(trip => trip.stops.map(item => ({ trip, item })));
+  // The API accepts incidents only on departed trips.
+  const available = trips.filter(trip => departedTrips[trip.id]).flatMap(trip => trip.stops.map(item => ({ trip, item })));
   const selected = available.find(({trip, item}) => `${trip.id}:${item.sequence}` === stop);
   const submit = async () => {
     if (!selected || busy) return;

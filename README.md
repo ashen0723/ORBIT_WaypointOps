@@ -39,7 +39,7 @@ Password for every account: `waypoint-demo` (set by `SEED_DEMO_PASSWORD`).
 | Store Manager | `store@waypoint.lk` | `/store` |
 | Store Manager (2nd outlet, permission checks) | `store2@waypoint.lk` | `/store` |
 
-The browser uses real JWT login, a dedicated API-backed Dispatcher workspace, and the shared operations workspace for Loader, Driver and Store. See [Dispatcher parts 1–6](docs/thisuni-dispatcher-parts-1-6.md) for implementation and verification.
+The browser uses real JWT login, a dedicated API-backed Dispatcher workspace, the Loader module, the Day-5 Driver UI on live data with a durable offline queue ([Driver offline](docs/driver-offline.md)), and the shared operations workspace for Store. See [Dispatcher parts 1–6](docs/thisuni-dispatcher-parts-1-6.md) for implementation and verification.
 See [Team integration and verification](docs/team-integration.md) for setup, handoffs and verified scenarios.
 
 Sessions are per browser tab: open one tab per role to follow an order across roles.
@@ -79,11 +79,11 @@ apps/
   web/                    React 18 + Vite + Tailwind — one app, four roles
     src/app/              root: login gate + role → module routing
     src/features/
-      operations/         Loader/Driver/Store workspace, durable offline queue
+      operations/         Store workspace, shared durable offline queue (offline.ts)
       dispatcher/         Login/session, live Dispatcher screens + retained prototypes
       store-manager/      Store Manager module
       loader/             Loader module
-      driver/             Driver module
+      driver/             Driver module; integration/ = live API adapter + offline outbox
     src/api/client.ts     fetch wrapper for the NestJS API
   api/                    NestJS 11 REST API (global prefix /api)
     src/<module>/         auth users outlets orders fleet planning trips loading delivery receipts sync common
@@ -114,7 +114,8 @@ The connected walkthrough and runnable automated checks are in [Team integration
 1. Store Manager places an order and notes the order ID.
 2. Dispatcher finds the same order, sees an invalid vehicle rejected with a reason, allocates correctly and publishes.
 3. Loader opens the trip, reports a shortfall, and marks ready after the dispatcher decision.
-4. Driver opens the trip, records arrival, outcome and proof of delivery, including one offline update.
+4. Driver opens the trip, records arrival, outcome and proof of delivery, including one offline update
+   (steps in [Driver offline](docs/driver-offline.md#repeatable-offline-test-qa--demo)).
 5. Store Manager confirms receipt or reports an issue.
 6. Dispatcher reviews completed history and deferral evidence.
 
@@ -125,6 +126,7 @@ The live form-based integration workspace replaces the disconnected mock modules
 ## Documentation
 
 - [Team integration and final verification](docs/team-integration.md)
+- [Driver integration and offline support](docs/driver-offline.md) — what works offline, sync guarantees, limitations, repeatable test
 
 - [API and workflow contract v1](docs/api-contract-v1.md) — agreed rules, shared DTOs, endpoint ownership,
   implementation handoffs. [Planning backend](docs/planning-backend.md) tracks implemented routes and remaining handoffs.

@@ -16,7 +16,7 @@ export function SignaturePad({ onSignedChange, onSignatureChange }: SignaturePad
   useEffect(() => {
     const valid = strokes.some(stroke => stroke.length > 1);
     onSignedChange(valid);
-    onSignatureChange?.(valid ? surfaceRef.current?.outerHTML : undefined);
+    onSignatureChange?.(valid && surfaceRef.current ? standaloneSvg(surfaceRef.current) : undefined);
   }, [strokes, onSignedChange, onSignatureChange]);
 
   const pointFromEvent = (event: PointerEvent<SVGSVGElement>): Point => {
@@ -69,4 +69,17 @@ export function SignaturePad({ onSignedChange, onSignatureChange }: SignaturePad
       <p className="mt-1 text-xs text-subtle">Ask the receiver to sign above.</p>
     </div>);
 
+}
+/** A self-contained SVG document (namespace + pixel size) that an <img>/canvas can load and rasterise. */
+function standaloneSvg(surface: SVGSVGElement): string {
+  const bounds = surface.getBoundingClientRect();
+  const width = Math.round(bounds.width) || 350;
+  const height = Math.round(bounds.height) || 128;
+  const copy = surface.cloneNode(true) as SVGSVGElement;
+  copy.removeAttribute('class');
+  copy.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  copy.setAttribute('width', String(width));
+  copy.setAttribute('height', String(height));
+  copy.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  return copy.outerHTML;
 }

@@ -44,7 +44,7 @@ export interface DriverStop {
 export interface DriverTrip {
   id: string;
   number: number;
-  brand: 'Waypoint Fresh' | 'Waypoint Style';
+  brand: 'Waypoint Fresh' | 'Waypoint Style' | 'Waypoint Tech';
   district: string;
   departure: string;
   status: DeliveryStatus;
