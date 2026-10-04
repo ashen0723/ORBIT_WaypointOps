@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { DriverApp } from './DriverApp';
 import { LiveDriverIntegration } from './integration/live';
@@ -12,7 +12,17 @@ export function LiveDriverApp({ basename }: { basename?: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [user?.id, token],
   );
-  useEffect(() => integration?.start(), [integration]);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (!integration) return;
+    setReady(false);
+    const stop = integration.start();
+    let active = true;
+    void integration.ready.finally(() => { if (active) setReady(true); });
+    return () => { active = false; stop(); };
+  }, [integration]);
   if (!integration) return null;
+  // Deep links and refreshes (including offline) must not redirect before the cached route is loaded.
+  if (!ready) return <p role="status" style={{ padding: 24, fontFamily: 'Inter, sans-serif' }}>Loading your route…</p>;
   return <DriverApp basename={basename} integration={integration} />;
 }

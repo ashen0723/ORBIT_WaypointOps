@@ -8,14 +8,14 @@ export function addMinutes(time: string, minutes: number): string {
 }
 
 export function windowStatus(eta: string | undefined, window: string): 'On time' | 'At risk' | 'Late' {
-  if (!eta) return 'On time';
-  const [, closeRaw] = window.split('–');
-  const toMinutes = (value: string) => {
-    const [h, m] = value.split(':').map(Number);
-    return h * 60 + m;
+  const toMinutes = (value: string | undefined) => {
+    const match = /(\d{1,2}):(\d{2})/.exec(value ?? '');
+    return match ? Number(match[1]) * 60 + Number(match[2]) : null;
   };
+  // Live routes may only know a planned time, not an "open–close" window: never fail the render over it.
   const etaMinutes = toMinutes(eta);
-  const closeMinutes = toMinutes(closeRaw);
+  const closeMinutes = toMinutes(window.split('–')[1]);
+  if (etaMinutes === null || closeMinutes === null) return 'On time';
   const diff = closeMinutes - etaMinutes;
   if (diff < 0) return 'Late';
   if (diff <= 20) return 'At risk';

@@ -6,7 +6,7 @@ import {
 } from '../../operations/offline';
 import type { DeliveryStatus, SyncState } from '../types/driver';
 import type { DeliveryDraft, DriverAction, DriverIdentity, DriverIntegration, PendingAction, StopRecord } from './driver';
-import { isDeparted, STOP_STATUS, toDriverTrip } from './mapping';
+import { colomboTime, isDeparted, STOP_STATUS, toDriverTrip } from './mapping';
 import { signatureToPng } from './signature';
 
 type Snapshot = ReturnType<DriverIntegration['getSnapshot']>;
@@ -67,14 +67,21 @@ export class LiveDriverIntegration implements DriverIntegration {
     this.snapshot = this.build();
   }
 
+  /**
+   * Resolves once the route is usable: the IndexedDB cache is loaded, and — when the cache is empty and a
+   * connection exists — the first server fetch has finished. Screens must not redirect on "no trip" before this.
+   */
+  ready: Promise<void> = Promise.resolve();
+
   /** Load the cached route and outbox, then refresh and sync whenever a connection is available. */
   start(): () => void {
     const onOnline = () => void this.sync();
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', this.emit);
-    void (async () => {
-      await this.loadCache();
-      if (this.online()) await this.sync();
+    this.ready = (async () => {
+      await this.loadCache().catch(() => undefined);
+      const first = this.online() ? this.sync() : Promise.resolve();
+      if (!this.trips.length) await first;
     })();
     return () => {
       window.removeEventListener('online', onOnline);
@@ -281,7 +288,7 @@ export class LiveDriverIntegration implements DriverIntegration {
     for (const trip of this.trips)
       for (const stop of trip.stops) {
         const status = STOP_STATUS[stop.status];
-        if (status) stopRecords[`${trip.id}-${stop.sequence}`] = { status, arrivedAt: stop.arrivedAt ?? undefined, syncState: 'Synced', photoCount: 0 };
+        if (status) stopRecords[`${trip.id}-${stop.sequence}`] = { status, arrivedAt: stop.arrivedAt ? colomboTime(stop.arrivedAt) : undefined, syncState: 'Synced', photoCount: 0 };
       }
     const actions: PendingAction[] = [];
     for (const entry of this.queue) {
@@ -299,12 +306,12 @@ export class LiveDriverIntegration implements DriverIntegration {
         continue;
       }
       if (entry.action.kind === 'ARRIVE' && (!current || current.status === 'Arrived'))
-        stopRecords[key] = { status: 'Arrived', arrivedAt: entry.action.request.capturedAt, syncState, photoCount: 0 };
+        stopRecords[key] = { status: 'Arrived', arrivedAt: colomboTime(entry.action.request.capturedAt), syncState, photoCount: 0 };
       if (entry.action.kind === 'OUTCOME') {
         const d = entry.action.request.delivery;
         const outcome = d.outcome === 'DELIVERED' ? 'full' : d.outcome === 'PARTIAL' ? 'partial' : 'failed';
         stopRecords[key] = {
-          status: OUTCOME_STATUS[outcome], outcome, completedAt: entry.action.request.capturedAt, syncState,
+          status: OUTCOME_STATUS[outcome], outcome, completedAt: colomboTime(entry.action.request.capturedAt), syncState,
           photoCount: entry.attachments.filter(a => a.slot === 'photo').length,
         };
       }
