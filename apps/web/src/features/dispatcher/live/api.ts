@@ -70,7 +70,7 @@ export function createDispatcherApi(
 export function useDispatcherApi() {
   const { token, user, expire } = useAuth();
   return useMemo(
-    () => createDispatcherApi(token ?? "", user?.id ?? "", expire),
+    () => createDispatcherApi(token ?? "", user?.id ?? "", () => expire(token)),
     [token, user?.id, expire],
   );
 }

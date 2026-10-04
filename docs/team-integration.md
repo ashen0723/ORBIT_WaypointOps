@@ -133,3 +133,22 @@ guards must apply `JwtAuthGuard` before `RolesGuard`.
 Validation: 137 unit/HTTP tests (115 API including importer/auth, 22 web), active frontend/contract and
 Prisma-script type checks, and API build. The native PostgreSQL/Chromium regression checks actual
 four-role login and planning/loading/delivery/receipt/offline flows after reconciliation.
+
+
+## Frontend session reconciliation (PR #10)
+
+The live provider keeps `token` and the optional compatibility alias `jwtToken` equal to the real
+backend JWT. No mock business token, mock identity mapping or mock database writes are used.
+`waypoint.live.session` remains the per-tab storage key so existing sessions survive the update.
+Old prototype authentication keys are discarded.
+
+On online reload the provider checks `/auth/me` before rendering role content. Revoked sessions clear
+on 401; other failures show retry/sign-out without discarding credentials. An unexpired cached Driver
+session can restore capture on a network failure, allowing the existing IndexedDB queue to survive
+an offline reload. This is not server authorization: reconnect rechecks identity and every replay is
+still validated by the API. Non-Driver restoration requires a successful identity check. Expiry clears
+the session without deleting the durable outbox. Logging in again can resume that actor's queue.
+
+Pending sign-in responses cannot undo logout; an old request's 401 cannot expire a newly signed-in
+account. Multipart evidence uploads retain browser-generated boundaries. Non-JSON HTTP errors retain
+their status, while non-JSON success bodies are rejected as invalid responses.

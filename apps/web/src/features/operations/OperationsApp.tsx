@@ -172,7 +172,7 @@ export function OperationsApp() {
           ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         });
       } catch (e) {
-        if (e instanceof ApiError && e.status === 401) expire();
+        if (e instanceof ApiError && e.status === 401) expire(token);
         throw e;
       }
     },

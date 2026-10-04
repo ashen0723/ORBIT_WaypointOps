@@ -42,11 +42,12 @@ export async function apiFetch<T>(
   try {
     body = text ? JSON.parse(text) : null;
   } catch {
-    throw new ApiError(
-      res.status,
-      "INVALID_RESPONSE",
-      "The server returned an unreadable response. Retry when available.",
-    );
+    if (res.ok)
+      throw new ApiError(
+        res.status,
+        "INVALID_RESPONSE",
+        "The server returned an unreadable response. Retry when available.",
+      );
   }
   if (!res.ok) {
     const error =
