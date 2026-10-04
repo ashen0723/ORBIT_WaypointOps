@@ -11,4 +11,7 @@ export interface ItemCheck {
   issueType: IssueType | null;
   description: string;
   photos: PhotoAttachment[];
+  acceptedQty: string;
+  damagedQty: string;
+  missingQty: string;
 }

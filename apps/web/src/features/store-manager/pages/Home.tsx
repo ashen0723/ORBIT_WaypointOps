@@ -9,15 +9,18 @@ import { StatCard } from '../components/orders/StatCard';
 import { OrdersTable } from '../components/orders/OrdersTable';
 import { OUTLET_NAME, TODAY, WEEK_START } from '../data/schedule';
 import { formatDateLong } from '../utils/format';
+import { todayColombo } from '../api/storeApi';
 
 export function Home() {
-  const { orders } = useOrders();
-  const current = orders.filter((o) => o.requestedDate >= TODAY || o.status === 'delivered' || o.status === 'deferred');
+  const { orders, live, loading, error } = useOrders();
+  const today = live ? todayColombo() : TODAY;
+  const weekStart = live ? todayColombo(new Date(Date.now() - 7 * 86400000)) : WEEK_START;
+  const current = orders.filter((o) => o.requestedDate >= today || o.status === 'delivered' || o.status === 'deferred');
 
   const stats = [
   {
     label: 'Orders Today',
-    value: orders.filter((o) => o.requestedDate === TODAY).length,
+    value: orders.filter((o) => o.requestedDate === today).length,
     tone: 'forest' as const
   },
   {
@@ -32,7 +35,7 @@ export function Home() {
   },
   {
     label: 'Delivered This Week',
-    value: orders.filter((o) => (o.status === 'delivered' || o.status === 'receipt_confirmed') && o.requestedDate >= WEEK_START).length,
+    value: orders.filter((o) => (o.status === 'delivered' || o.status === 'receipt_confirmed') && o.requestedDate >= weekStart).length,
     tone: 'surface' as const
   }];
 
@@ -41,7 +44,7 @@ export function Home() {
     <PageContainer className="pb-32 md:pb-8">
       <PageHeader
         title="My Orders"
-        subtitle={`${OUTLET_NAME} · ${formatDateLong(TODAY)}`}
+        subtitle={`${live ? 'Your outlet' : OUTLET_NAME} · ${formatDateLong(today)}`}
         actions={
         <Link to="/place-order" className={`${buttonStyles('primary', 'lg')} hidden md:inline-flex`}>
             <PlusIcon aria-hidden="true" className="h-5 w-5" />
@@ -55,6 +58,8 @@ export function Home() {
         <StatCard key={s.label} {...s} />
         )}
       </section>
+      {live && loading && <p role="status" className="mt-4 text-sm text-subtle">Loading Store orders…</p>}
+      {live && error && <p role="alert" className="mt-4 text-sm text-danger-ink">{error}</p>}
 
       <section aria-labelledby="orders-heading" className="mt-8">
         <div className="mb-4 flex items-baseline justify-between gap-4">

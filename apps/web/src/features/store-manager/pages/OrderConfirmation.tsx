@@ -15,12 +15,12 @@ import { totalQuantity } from '../utils/orders';
 
 export function OrderConfirmation() {
   const { orderId } = useParams();
-  const { getOrder } = useOrders();
+  const { getOrder, loading, live } = useOrders();
   const reduce = useReducedMotion();
   const [copied, setCopied] = useState(false);
   const order = getOrder(orderId);
 
-  if (!order) return <OrderNotFound />;
+  if (!order) return loading ? <PageContainer><p role="status">Loading order…</p></PageContainer> : <OrderNotFound />;
 
   const handleCopy = () => {
     navigator.clipboard?.writeText(order.id).catch(() => undefined);
@@ -30,8 +30,8 @@ export function OrderConfirmation() {
 
   const steps = [
   { title: 'Confirmed', body: 'Received by Waypoint dispatch', time: 'Just now', done: true },
-  { title: 'Planned by dispatcher', body: 'Assigned to a vehicle and route — an ETA appears then', time: 'By 8:00 PM', done: false },
-  { title: 'Out for delivery', body: NEXT_DELIVERY[order.brand].note, time: formatDate(order.requestedDate), done: false }];
+  { title: 'Planned by dispatcher', body: 'Assigned to a vehicle and route — an ETA appears then', time: live ? 'Pending' : 'By 8:00 PM', done: false },
+  { title: 'Out for delivery', body: live ? 'Dispatch will confirm the delivery schedule' : NEXT_DELIVERY[order.brand].note, time: formatDate(order.requestedDate), done: false }];
 
 
   return (
@@ -86,7 +86,7 @@ export function OrderConfirmation() {
             <dt className="text-subtle">Submitted</dt>
             <dd className="text-right font-medium text-ink">
               {order.submittedAt}
-              <span className="block text-xs font-normal text-subtle">Before the {CUTOFF_LABEL} cutoff</span>
+              {!live && <span className="block text-xs font-normal text-subtle">Before the {CUTOFF_LABEL} cutoff</span>}
             </dd>
           </div>
         </dl>

@@ -9,7 +9,7 @@ import { StoreUser } from './store-auth.guard';
 const orderDetails = {
   outlet: true,
   lines: { include: { attemptLines: true } },
-  stops: { include: { trip: { include: { vehicle: true } }, delivery: { include: { lines: true, pod: true, receipt: { include: { lines: true } } } } }, orderBy: { createdAt: 'asc' } },
+  stops: { include: { lines: true, trip: { include: { vehicle: true } }, delivery: { include: { pod: true, receipt: { include: { lines: true } } } } }, orderBy: { createdAt: 'asc' } },
 } as const;
 
 function dateOnly(value: Date | null): string | null { return value?.toISOString().slice(0, 10) ?? null; }

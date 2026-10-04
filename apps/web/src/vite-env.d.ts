@@ -2,6 +2,7 @@
 
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string;
+  readonly VITE_STORE_DATA_SOURCE?: 'mock' | 'api';
 }
 
 interface ImportMeta {

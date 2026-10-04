@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useOrders } from '../contexts/OrdersContext';
 import { PageContainer } from '../components/ui/PageContainer';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -10,14 +11,34 @@ import { DeliveryProgress } from '../components/dashboard/DeliveryProgress';
 import { CutoffBanner } from '../components/orders/CutoffBanner';
 import { useCutoffSeconds } from '../contexts/CutoffContext';
 import { WEEK_START } from '../data/schedule';
+import { todayColombo } from '../api/storeApi';
+import { OrdersTable } from '../components/orders/OrdersTable';
+import { buttonStyles } from '../components/ui/Button';
 
 export function DashboardLab() {
-  const { orders } = useOrders();
+  const { orders, live, loading, error } = useOrders();
   const cutoffSeconds = useCutoffSeconds();
-  const week = orders.filter((o) => o.requestedDate >= WEEK_START);
+  const weekStart = live ? todayColombo(new Date(Date.now() - 7 * 86400000)) : WEEK_START;
+  const week = orders.filter((o) => o.requestedDate >= weekStart);
   const delivered = week.filter((o) => o.status === 'delivered' || o.status === 'receipt_confirmed').length;
   const inProgress = week.filter((o) => ['confirmed', 'planned', 'loading', 'in_transit'].includes(o.status)).length;
   const deferred = orders.filter((o) => o.status === 'deferred').length;
+
+  if (live) return (
+    <PageContainer>
+      <PageHeader title="Dashboard" subtitle="Your outlet’s orders and deliveries" />
+      {loading && <p role="status" className="mt-4 text-sm text-subtle">Loading Store orders…</p>}
+      {error && <p role="alert" className="mt-4 text-sm text-danger-ink">{error}</p>}
+      <section aria-label="This week at a glance" className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
+        <StatCard label="Total Orders" value={week.length} highlight />
+        <StatCard label="Delivered" value={delivered} />
+        <StatCard label="In Progress" value={inProgress} />
+        <StatCard label="Deferred" value={deferred} />
+      </section>
+      <div className="mt-6 flex justify-end"><Link to="/place-order" className={buttonStyles('primary', 'md')}>Place order</Link></div>
+      <section className="mt-6" aria-label="Recent orders"><OrdersTable orders={orders} label="Recent orders" /></section>
+    </PageContainer>
+  );
 
   return (
     <PageContainer>

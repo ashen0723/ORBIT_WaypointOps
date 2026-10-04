@@ -37,7 +37,7 @@ export function EtaCard({ order }: {order: Order;}) {
   }
 
   if ((order.status === 'delivered' || order.status === 'receipt_confirmed') && order.deliveredAt) {
-    const confirmed = order.status === 'receipt_confirmed';
+    const confirmed = order.status === 'receipt_confirmed' || order.receiptConfirmed;
     return (
       <Card className="p-4 md:p-6">
         <p className="text-sm font-medium text-subtle">Delivered</p>
