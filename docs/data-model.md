@@ -1,5 +1,9 @@
 # Data model
 
+The [API and workflow contract v1](api-contract-v1.md) records the agreed cancellation, delivery-attempt,
+plan-version and sync behavior. Its schema checklist identifies required new migrations; the draft below
+does not yet implement those extensions.
+
 Source of truth: [`apps/api/prisma/schema.prisma`](../apps/api/prisma/schema.prisma) (draft; owners refine
 fields through migrations). Initial migration: `apps/api/prisma/migrations/0001_init`.
 

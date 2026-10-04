@@ -59,6 +59,7 @@ npm run dev:web
   and `start:dev`; run `npx prisma generate` in `apps/api` after editing the schema in an already-running session.
 - Schema changes: `cd apps/api && npx prisma migrate dev --name <change>` after editing `prisma/schema.prisma`.
 - Tests: `npm test` (web: Vitest, api: Jest).
+- Shared contract checks: `npm run typecheck -w packages/contracts`.
 
 > **npm 11 note:** npm 11 skips package install scripts unless approved. If `prisma` or `bcrypt` misbehave
 > locally, run `npm approve-scripts --allow-scripts-pending` and reinstall. Docker images use npm 10 and are
@@ -115,6 +116,8 @@ _To be completed by module owners._ Merge-level changes are in [docs/merge-notes
 
 ## Documentation
 
+- [API and workflow contract v1](docs/api-contract-v1.md) — agreed rules, shared DTOs, endpoint ownership,
+  and required schema changes; endpoints remain implementation work.
 - [Architecture](docs/architecture.md)
 - [Data model](docs/data-model.md)
 - [AI tool disclosure](docs/ai-disclosure.md)
