@@ -1,19 +1,62 @@
 import {
+  Body,
   Controller,
   Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
   Req,
-} from '@nestjs/common';
-import { LoadingService } from './loading.service';
-import type { LoaderTripSummary } from './loading.types';
-import { requireLoader, type AuthenticatedLoaderRequest } from './loader-auth';
-
-@Controller('loader')
+  UseGuards,
+} from "@nestjs/common";
+import { AuthGuard, Roles, type AuthRequest } from "../auth/auth.guard";
+import { DecisionsService } from "../planning/decisions.service";
+@Controller()
+@UseGuards(AuthGuard)
 export class LoadingController {
-  constructor(private readonly loadingService: LoadingService) {}
-
-  @Get('trips')
-  listTrips(@Req() request: AuthenticatedLoaderRequest): Promise<LoaderTripSummary[]> {
-    const user = requireLoader(request);
-    return this.loadingService.listPublishedTrips(user.depotId);
+  constructor(private readonly decisions: DecisionsService) {}
+  @Get("trips/:id/loading")
+  @Roles("LOADER", "DISPATCHER")
+  loading(@Req() req: AuthRequest, @Param("id") id: string) {
+    return this.decisions.getLoading(req.user, id);
+  }
+  @Post("loading/:id/start")
+  @HttpCode(200)
+  @Roles("LOADER")
+  start(
+    @Req() req: AuthRequest,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    return this.decisions.startLoading(req.user, id, body);
+  }
+  @Patch("loading/:id/lines/:lineId")
+  @Roles("LOADER")
+  line(
+    @Req() req: AuthRequest,
+    @Param("id") id: string,
+    @Param("lineId") lineId: string,
+    @Body() body: unknown,
+  ) {
+    return this.decisions.loadLine(req.user, id, lineId, body);
+  }
+  @Post("loading/:id/issues")
+  @Roles("LOADER")
+  report(
+    @Req() req: AuthRequest,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    return this.decisions.reportIssue(req.user, id, body);
+  }
+  @Post("loading/issues/:id/acknowledge")
+  @HttpCode(200)
+  @Roles("LOADER")
+  acknowledge(
+    @Req() req: AuthRequest,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    return this.decisions.acknowledgeIssue(req.user, id, body);
   }
 }

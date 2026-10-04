@@ -75,11 +75,12 @@ describe('Loader completion API', () => {
     await expect(markTripReady('loader-token', 'TRIP 1')).resolves.toMatchObject({
       tripStatus: 'READY', loadingStatus: 'COMPLETED',
     });
+    expect(new Headers(fetchMock.mock.calls[0][1].headers).get('Authorization')).toBe('Bearer loader-token');
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/trips/TRIP%201/ready',
       expect.objectContaining({
         method: 'POST',
-        headers: expect.objectContaining({ Authorization: 'Bearer loader-token' }),
+        headers: expect.any(Headers),
       }),
     );
   });

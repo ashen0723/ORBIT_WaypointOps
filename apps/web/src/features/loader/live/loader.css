@@ -1,0 +1,46 @@
+.loader-live nav {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.loader-live a {
+  color: #176044;
+  text-decoration: underline;
+}
+.loader-filters {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin: 20px 0;
+}
+.loader-filters label {
+  flex: 1;
+  min-width: 180px;
+}
+.loader-work {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.loader-live .ops-card {
+  overflow-wrap: anywhere;
+}
+.loader-live li {
+  margin: 8px 0;
+}
+.loader-live input[type="file"] {
+  max-width: 100%;
+}
+@media (max-width: 600px) {
+  .loader-live header {
+    padding: 16px;
+  }
+  .loader-live main {
+    padding: 20px 14px;
+  }
+  .loader-live .ops-heading {
+    align-items: flex-start;
+    gap: 10px;
+  }
+}

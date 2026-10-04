@@ -30,6 +30,7 @@ enum Brand {
 enum TempRequirement {
   AMBIENT
   CHILLED
+  FROZEN
 }
 
 enum VehicleType {
@@ -147,11 +148,11 @@ model User {
   depot   Depot?   @relation(fields: [depotId], references: [id])
   vehicle Vehicle? @relation(fields: [vehicleId], references: [id])
 
-  ordersCreated   Order[]         @relation("OrderCreatedBy")
-  loadingRecords  LoadingRecord[]
-  receipts        Receipt[]
-  auditEvents     AuditEvent[]
-  syncActions     SyncAction[]
+  ordersCreated  Order[]         @relation("OrderCreatedBy")
+  loadingRecords LoadingRecord[]
+  receipts       Receipt[]
+  auditEvents    AuditEvent[]
+  syncActions    SyncAction[]
 }
 
 model Outlet {
@@ -162,6 +163,7 @@ model Outlet {
   depotId           String
   dockType          DockType
   parkingConstraint ParkingConstraint
+  scheduledWeekday  Int? // STYLE outlet weekly weekday, ISO 1=Monday..6=Saturday
   mallWindow        String? // "HH:MM-HH:MM"; null outside malls
   windowOpenTime    String // "HH:MM"
   windowCloseTime   String // "HH:MM"
@@ -211,10 +213,15 @@ model Order {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
-  outlet    Outlet      @relation(fields: [outletId], references: [id])
-  createdBy User        @relation("OrderCreatedBy", fields: [createdById], references: [id])
-  lines     OrderLine[]
-  stop      TripStop?
+  outlet            Outlet          @relation(fields: [outletId], references: [id])
+  createdBy         User            @relation("OrderCreatedBy", fields: [createdById], references: [id])
+  lines             OrderLine[]
+  stops             TripStop[]
+  version           Int             @default(1)
+  recoveryPending   Boolean         @default(false)
+  // Server-authorized next-attempt quantities. Null means an untouched initial order.
+  pendingQuantities Json?
+  deferrals         OrderDeferral[]
 
   @@index([outletId, requestedDate])
   @@index([status])
@@ -226,14 +233,20 @@ model OrderLine {
   item         String
   unit         String
   requestedQty Int
+  cancelledQty Int      @default(0)
+  unitWeightKg Float?
+  unitVolumeM3 Float?
   loadedQty    Int?
   deliveredQty Int?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  order         Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order         Order                  @relation(fields: [orderId], references: [id], onDelete: Cascade)
   loadingIssues LoadingIssue[]
   receiptIssues ReceiptIssue[]
+  attemptLines  TripStopLine[]
+  cancellations QuantityCancellation[]
+  receiptLines  ReceiptLine[]
 }
 
 // ─── Planning and trips ─────────────────────────────────────────────────────
@@ -257,23 +270,43 @@ model Trip {
   stops         TripStop[]
   loadingRecord LoadingRecord?
 
-  @@unique([vehicleId, date, tripNo])
+  version                       Int       @default(1)
+  planVersion                   Int       @default(1)
+  driverId                      String?
+  publishedAt                   DateTime?
+  loaderAcknowledgedPlanVersion Int?
+  releasedAt                    DateTime?
+  plannedDepartureAt            DateTime?
+  plannedReturnAt               DateTime?
+  fuelWeekStart                 DateTime? @db.Date
+  reservedFuelL                 Float     @default(0)
+  committedFuelL                Float     @default(0)
+  departedAt                    DateTime?
+  departedPlanVersion           Int?
+
+  // Active slot uniqueness is a partial index in migration 0002.
+  @@index([vehicleId, date, tripNo])
+  @@index([vehicleId, fuelWeekStart])
 }
 
 model TripStop {
-  id        String     @id @default(cuid())
-  tripId    String
-  orderId   String     @unique // an order belongs to at most one active stop
-  sequence  Int
-  etaTime   String? // "HH:MM"
-  status    StopStatus @default(PLANNED)
-  arrivedAt DateTime?
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id               String     @id @default(cuid())
+  tripId           String
+  orderId          String // historical attempts; partial unique index protects active assignment
+  active           Boolean    @default(true)
+  plannedArrivalAt DateTime?
+  reschedule       Json?
+  sequence         Int
+  etaTime          String? // "HH:MM"
+  status           StopStatus @default(PLANNED)
+  arrivedAt        DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 
-  trip     Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  order    Order     @relation(fields: [orderId], references: [id])
+  trip     Trip           @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  order    Order          @relation(fields: [orderId], references: [id])
   delivery Delivery?
+  lines    TripStopLine[]
 
   @@unique([tripId, sequence])
 }
@@ -296,20 +329,27 @@ model LoadingRecord {
 }
 
 model LoadingIssue {
-  id              String             @id @default(cuid())
-  loadingRecordId String
-  orderLineId     String
-  type            LoadingIssueType
-  expectedQty     Int
-  availableQty    Int
-  note            String?
-  evidenceRef     String?
-  decision        String? // dispatcher decision text
-  status          LoadingIssueStatus @default(OPEN)
-  acknowledgedById String?
-  acknowledgedAt   DateTime?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  id                  String             @id @default(cuid())
+  loadingRecordId     String
+  orderLineId         String
+  type                LoadingIssueType
+  expectedQty         Int
+  availableQty        Int
+  note                String?
+  decision            String? // legacy description; structured decisions use decisionData
+  decisionData        Json?
+  version             Int                @default(1)
+  stopId              String?
+  reportedPlanVersion Int                @default(1)
+  decidedById         String?
+  decidedAt           DateTime?
+  acknowledgedById    String?
+  acknowledgedAt      DateTime?
+  cancelledQty        Int                @default(0)
+  photoRefs           String[]
+  status              LoadingIssueStatus @default(OPEN)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   loadingRecord LoadingRecord @relation(fields: [loadingRecordId], references: [id], onDelete: Cascade)
   orderLine     OrderLine     @relation(fields: [orderLineId], references: [id])
@@ -327,6 +367,12 @@ model Delivery {
   clientActionId String?    @unique // offline idempotency key
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
+
+  recorded                 Json?
+  capturedAt               DateTime?
+  version                  Int                @default(1)
+  requiresDispatcherReview Boolean            @default(false)
+  recoveryDecisions        RecoveryDecision[]
 
   stop    TripStop         @relation(fields: [stopId], references: [id])
   pod     ProofOfDelivery?
@@ -358,6 +404,7 @@ model Receipt {
   delivery    Delivery       @relation(fields: [deliveryId], references: [id])
   confirmedBy User           @relation(fields: [confirmedById], references: [id])
   issues      ReceiptIssue[]
+  lines       ReceiptLine[]
 }
 
 model ReceiptIssue {
@@ -405,4 +452,178 @@ model SyncAction {
   syncedAt       DateTime?
 
   user User @relation(fields: [userId], references: [id])
+}
+
+// Draft JSON contains PlanInput only; never reserves orders, fuel or a trip slot.
+model PlanDraft {
+  id              String   @id @default(cuid())
+  version         Int      @default(1)
+  plan            Json
+  createdById     String
+  allocatedTripId String?  @unique
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model TripStopLine {
+  id            String    @id @default(cuid())
+  stopId        String
+  orderLineId   String
+  version       Int       @default(1)
+  plannedQty    Int
+  cancelledQty  Int       @default(0)
+  loadedQty     Int?
+  deliveredQty  Int?
+  returnedQty   Int?
+  pendingUnload Boolean   @default(false)
+  stop          TripStop  @relation(fields: [stopId], references: [id], onDelete: Cascade)
+  orderLine     OrderLine @relation(fields: [orderLineId], references: [id])
+
+  @@unique([stopId, orderLineId])
+}
+
+model QuantityCancellation {
+  id             String    @id @default(cuid())
+  orderLineId    String
+  loadingIssueId String    @unique
+  qty            Int
+  reason         String
+  actorId        String
+  recordedAt     DateTime  @default(now())
+  orderLine      OrderLine @relation(fields: [orderLineId], references: [id])
+}
+
+model ReceiptLine {
+  id          String    @id @default(cuid())
+  receiptId   String
+  orderLineId String
+  acceptedQty Int
+  damagedQty  Int
+  missingQty  Int
+  note        String?
+  photoRefs   String[]
+  receipt     Receipt   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  orderLine   OrderLine @relation(fields: [orderLineId], references: [id])
+
+  @@unique([receiptId, orderLineId])
+}
+
+model RecoveryDecision {
+  id               String   @id @default(cuid())
+  sourceDeliveryId String
+  version          Int      @default(1)
+  decision         Json
+  decidedById      String
+  decidedAt        DateTime @default(now())
+  retryStopId      String?
+  delivery         Delivery @relation(fields: [sourceDeliveryId], references: [id])
+
+  @@index([retryStopId])
+}
+
+model FieldConflict {
+  id                 String    @id @default(cuid())
+  version            Int       @default(1)
+  userId             String
+  clientActionId     String
+  action             Json
+  currentPlanVersion Int
+  recordedAt         DateTime  @default(now())
+  resolvedAt         DateTime?
+  resolution         Json?
+
+  @@unique([userId, clientActionId])
+}
+
+model MutationRecord {
+  id             String   @id @default(cuid())
+  actorId        String
+  clientActionId String
+  requestHash    String
+  response       Json
+  createdAt      DateTime @default(now())
+
+  @@unique([actorId, clientActionId])
+}
+
+model OperatingDay {
+  date      DateTime @id @db.Date
+  operating Boolean
+}
+
+// Authoritative directed legs. Keys are "depot:<id>" or "outlet:<id>".
+// Missing legs are infeasible, never implicitly zero or symmetric.
+model TravelLeg {
+  id          String @id @default(cuid())
+  fromKey     String
+  toKey       String
+  distanceKm  Float
+  durationMin Float
+  source      String
+
+  @@unique([fromKey, toKey])
+}
+
+model OutletHandling {
+  outletId   String @id
+  serviceMin Float
+  source     String
+}
+
+model VehicleAvailability {
+  id        String   @id @default(cuid())
+  vehicleId String
+  date      DateTime @db.Date
+  available Boolean
+
+  @@unique([vehicleId, date])
+}
+
+model OrderDeferral {
+  id           String    @id @default(cuid())
+  orderId      String
+  fromDate     DateTime? @db.Date
+  toDate       DateTime  @db.Date
+  reason       String
+  actorId      String
+  recordedAt   DateTime  @default(now())
+  sourceStopId String?   @unique
+  order        Order     @relation(fields: [orderId], references: [id])
+
+  @@index([orderId, recordedAt])
+}
+
+model CatalogItem {
+  id           String          @id @default(cuid())
+  brand        Brand
+  name         String
+  unit         String
+  temp         TempRequirement
+  unitWeightKg Float
+  unitVolumeM3 Float
+  active       Boolean         @default(true)
+}
+
+// Durable access-controlled bytes: no public upload directory or expiring browser URLs.
+model Evidence {
+  id        String   @id @default(cuid())
+  ownerId   String
+  orderId   String
+  tripId    String?
+  mediaType String
+  sizeBytes Int
+  bytes     Bytes
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+}
+
+model DriverIssue {
+  id         String   @id @default(cuid())
+  tripId     String
+  stopId     String?
+  userId     String
+  recorded   Json
+  capturedAt DateTime
+  recordedAt DateTime @default(now())
 }
