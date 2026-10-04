@@ -1,4 +1,3 @@
-import React from 'react';
 import { PackageIcon, SnowflakeIcon } from 'lucide-react';
 import { useDriver } from '../../contexts/DriverContext';
 import { useSyncQueue } from '../../hooks/useSyncQueue';
@@ -8,7 +7,7 @@ import { StateBanner } from './StateBanner';
 import { SyncIndicator } from './SyncIndicator';
 
 export function RouteSidePanel({ trip }: {trip: DriverTrip;}) {
-  const { connection, lastSyncedAt, getStopRecord } = useDriver();
+  const { connection, lastSyncedAt, getStopRecord, actions } = useDriver();
   const queue = useSyncQueue();
   const totalCases = trip.stops.reduce((sum, stop) => sum + stop.cases, 0);
   const chilledCases = trip.stops.reduce((sum, stop) => sum + stop.chilledCases, 0);
@@ -18,7 +17,7 @@ export function RouteSidePanel({ trip }: {trip: DriverTrip;}) {
       {connection === 'offline' &&
       <Card className="border border-amber/40 p-4">
           <p className="font-semibold text-ink">Waiting to sync</p>
-          <p className="mt-2 text-sm text-subtle">{queue.deliveries} deliveries, {queue.photos} photos, {queue.issues} issue report</p>
+          <p className="mt-2 text-sm text-subtle">{queue.total} actions awaiting synchronization</p>
           <p className="mt-1 text-xs text-subtle">Last synced {lastSyncedAt}</p>
         </Card>
       }
@@ -55,12 +54,12 @@ export function RouteSidePanel({ trip }: {trip: DriverTrip;}) {
               </li>);
 
           })}
-          {queue.issues > 0 &&
-          <li className="flex items-center justify-between gap-3 py-2.5 text-sm">
+          {actions.filter(action => action.kind === 'issue' && action.tripId === trip.id).map(action =>
+          <li key={action.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
               <span className="font-semibold text-ink">Issue report</span>
-              <SyncIndicator state="Saved on phone" />
+              <SyncIndicator state={action.state} />
             </li>
-          }
+          )}
         </ul>
       </Card>
     </div>);

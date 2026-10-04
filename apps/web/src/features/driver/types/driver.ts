@@ -8,7 +8,7 @@ export type DeliveryStatus =
 'Failed' |
 'Changed by dispatcher';
 
-export type SyncState = 'Synced' | 'Saved on phone' | 'Needs attention';
+export type SyncState = 'Synced' | 'Saved on phone' | 'Needs attention' | 'Pending' | 'Syncing' | 'Failed' | 'Conflict' | 'Demo only';
 export type ConnectionState = 'online' | 'offline' | 'syncing';
 export type DeliveryOutcome = 'full' | 'partial' | 'failed';
 export type AccessType = 'normal' | 'van_only' | 'mall_dock';
@@ -18,10 +18,13 @@ export interface DriverItem {
   id: string;
   name: string;
   planned: number;
+  loaded?: number;
   chilled: boolean;
 }
 
 export interface DriverStop {
+  id?: string;
+  orderId?: string;
   sequence: number;
   outletId: string;
   name: string;

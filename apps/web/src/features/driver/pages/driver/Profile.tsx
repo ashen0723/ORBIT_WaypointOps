@@ -1,14 +1,12 @@
-import React from 'react';
 import { ChevronRightIcon, MapPinIcon, ShieldCheckIcon, SmartphoneIcon, SnowflakeIcon, TruckIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ConnectionPill } from '../../components/driver/ConnectionPill';
 import { PageIntro } from '../../components/driver/PageIntro';
 import { Card } from '../../components/ui/Card';
 import { useDriver } from '../../contexts/DriverContext';
-import { DRIVER } from '../../data/driver';
 
 export function Profile() {
-  const { connection, lastSyncedAt } = useDriver();
+  const { identity: DRIVER, connection, lastSyncedAt } = useDriver();
   const initials = DRIVER.name.split(' ').map((part) => part[0]).join('').slice(0, 2);
   return (
     <div className="max-w-5xl space-y-5 md:space-y-6">
@@ -24,7 +22,7 @@ export function Profile() {
         </div>
       </Card>
       <div className="grid gap-4 md:grid-cols-2">
-        <section className="rounded-panel bg-brand-pale p-5 text-forest shadow-card"><div className="flex items-start gap-3"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-surface shadow-card"><ShieldCheckIcon aria-hidden className="h-5 w-5" /></span><div><h2 className="font-semibold">Offline readiness</h2><p className="mt-2 text-sm leading-6 opacity-75">Today's routes, contacts, item lists, and proof records stay available without signal.</p><p className="mt-3 text-xs font-semibold">Routes saved on this device ✓</p></div></div></section>
+        <section className="rounded-panel bg-brand-pale p-5 text-forest shadow-card"><div className="flex items-start gap-3"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-surface shadow-card"><ShieldCheckIcon aria-hidden className="h-5 w-5" /></span><div><h2 className="font-semibold">Offline readiness</h2><p className="mt-2 text-sm leading-6 opacity-75">Available route data remains visible when signal drops. Durable storage requires the queue integration.</p><p className="mt-3 text-xs font-semibold">Check the synchronization panel for save status.</p></div></div></section>
         <Link to="/safe-use" className="flex min-h-40 items-center gap-4 rounded-panel bg-amber-pale p-5 text-amber-ink shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-surface shadow-card"><SmartphoneIcon aria-hidden className="h-5 w-5" /></span><span className="min-w-0 flex-1"><span className="block font-semibold">Preview safe-use mode</span><span className="mt-2 block text-sm leading-6 opacity-75">See the simplified screen shown while the vehicle is moving.</span></span><ChevronRightIcon aria-hidden className="h-5 w-5" /></Link>
       </div>
       <p className="text-center text-xs leading-5 text-subtle">Signed in through Waypoint shared login.</p>

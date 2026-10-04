@@ -1,8 +1,8 @@
-import React from 'react';
+import { useDriver } from '../../contexts/DriverContext';
 import { Link } from 'react-router-dom';
-import { DRIVER } from '../../data/driver';
 
 export function DriverProfileSummary({ compact = false }: {compact?: boolean;}) {
+  const { identity: DRIVER } = useDriver();
   return (
     <Link
       to="/profile"

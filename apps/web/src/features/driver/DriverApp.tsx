@@ -1,7 +1,8 @@
-import React from 'react';
+import { useAuth } from '../../app/providers/AuthProvider';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { DriverShell } from './components/driver/DriverShell';
+import type { DriverIntegration } from './integration/driver';
 import { DriverProvider } from './contexts/DriverContext';
 import { CurrentStop } from './pages/driver/CurrentStop';
 import { DeliveryOutcome } from './pages/driver/DeliveryOutcome';
@@ -16,9 +17,10 @@ import { Today } from './pages/driver/Today';
 import { TripCheck } from './pages/driver/TripCheck';
 import { TripComplete } from './pages/driver/TripComplete';
 
-export function DriverApp({ basename }: {basename?: string;} = {}) {
+export function DriverApp({ basename, integration }: {basename?: string; integration?: DriverIntegration;} = {}) {
+  const { user } = useAuth();
   return (
-    <DriverProvider>
+    <DriverProvider integration={integration} user={user}>
       <BrowserRouter basename={basename}>
         <Routes>
           <Route path="safe-use" element={<SafeUse />} />

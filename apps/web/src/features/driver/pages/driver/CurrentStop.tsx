@@ -1,12 +1,10 @@
-import React from 'react';
 import { ArrowRightIcon, CheckCircle2Icon, Clock3Icon, MapPinnedIcon, PackageIcon, SnowflakeIcon } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 import { PageIntro } from '../../components/driver/PageIntro';
 import { useDriver } from '../../contexts/DriverContext';
-import { TRIPS } from '../../data/driver';
 
 export function CurrentStop() {
-  const { departedTrips, getNextStopSequence } = useDriver();
+  const { trips: TRIPS, departedTrips, getNextStopSequence } = useDriver();
   const activeTrip = TRIPS.find((trip) => departedTrips[trip.id] && getNextStopSequence(trip.id) !== null);
 
   if (activeTrip) {

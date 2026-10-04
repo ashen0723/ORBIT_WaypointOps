@@ -1,4 +1,4 @@
-import React from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { CircleUserRoundIcon, FlaskConicalIcon, LogOutIcon, MapPinnedIcon, RouteIcon, TriangleAlertIcon } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -8,7 +8,7 @@ type NavItem = {
   to: string;
   label: string;
   shortLabel: string;
-  icon: React.ComponentType<{className?: string;'aria-hidden'?: boolean;}>;
+  icon: LucideIcon;
   end: boolean;
   mobile: boolean;
 };
@@ -38,7 +38,7 @@ export function DriverNav({ variant }: {variant: Variant;}) {
   if (variant === 'rail') return <nav aria-label="Driver navigation"><ul className="flex flex-col gap-2">{[...MENU_ITEMS, ...GENERAL_ITEMS].map((item) => <CompactLink key={item.to} item={item} variant={variant} pathname={location.pathname} />)}</ul></nav>;
 
   const signOut = () => {
-    toast('Signed out of Waypoint Driver', { description: 'Offline records stay saved on this phone until they sync.' });
+    toast('Signed out of Waypoint Driver', { description: 'Check pending actions before leaving.' });
     navigate('/');
     void logout(); // merge: shared session logout; root returns to /login
   };
