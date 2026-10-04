@@ -20,17 +20,17 @@ export interface ApiRequestInit extends RequestInit {
 /** JSON fetch against the real backend. Throws ApiError with the server's code/message on non-2xx. */
 export async function apiFetch<T>(path: string, init: ApiRequestInit = {}): Promise<T> {
   const { token, headers, ...rest } = init;
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...rest,
-    headers: {
-      Accept: 'application/json',
-      ...(rest.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...headers,
-    },
-  });
+  const requestHeaders = new Headers(headers);
+  requestHeaders.set('Accept', 'application/json');
+  if (rest.body !== undefined) requestHeaders.set('Content-Type', 'application/json');
+  if (token) requestHeaders.set('Authorization', `Bearer ${token}`);
+  const res = await fetch(`${API_BASE}${path}`, { ...rest, headers: requestHeaders });
   const text = await res.text();
-  const body = text ? JSON.parse(text) : null;
+  let body = null;
+  try { body = text ? JSON.parse(text) : null; }
+  catch {
+    if (res.ok) throw new ApiError(res.status, 'INVALID_RESPONSE', 'The server returned an invalid response.');
+  }
   if (!res.ok) {
     throw new ApiError(res.status, body?.code ?? 'HTTP_ERROR', body?.message ?? res.statusText, body?.details ?? null);
   }
