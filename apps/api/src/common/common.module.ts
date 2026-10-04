@@ -1,6 +1,6 @@
 import { Global, Module } from '@nestjs/common';
-
-/** Shared cross-cutting pieces: exception filters (standard error shape), guards, pipes. */
+import { APP_FILTER } from '@nestjs/core';
+import { ApiExceptionFilter } from './api-exception.filter';
 @Global()
-@Module({})
+@Module({ providers: [{ provide: APP_FILTER, useClass: ApiExceptionFilter }] })
 export class CommonModule {}

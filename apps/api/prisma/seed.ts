@@ -6,6 +6,7 @@
  */
 import { config } from 'dotenv';
 import bcrypt from 'bcrypt';
+import { importCalendar, seedDemoCalendar } from './calendar-data';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, Role, Brand, DockType, ParkingConstraint, VehicleType, VehicleTemp } from '../src/generated/prisma/client';
 
@@ -62,6 +63,9 @@ async function main(): Promise<void> {
     const { email, ...data } = u;
     await prisma.user.upsert({ where: { email }, update: { ...data, passwordHash }, create: { ...u, passwordHash } });
   }
+
+  if (process.env.OPERATING_CALENDAR_CSV) await importCalendar(prisma, process.env.OPERATING_CALENDAR_CSV);
+  else await seedDemoCalendar(prisma);
 
   console.log(`Seeded ${depots.length} depots, ${outlets.length} outlets, ${vehicles.length} vehicles, ${users.length} users.`);
 }
