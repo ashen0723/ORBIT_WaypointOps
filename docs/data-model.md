@@ -1,5 +1,9 @@
 # Data model
 
+The [API and workflow contract v1](api-contract-v1.md) records the agreed cancellation, delivery-attempt,
+plan-version and sync behavior. Migration `0002_planning_contract` adds the planning and quantity-history foundation.
+See [planning implementation status](planning-backend.md) for the implemented mappings and remaining owner work.
+
 Source of truth: [`apps/api/prisma/schema.prisma`](../apps/api/prisma/schema.prisma) (draft; owners refine
 fields through migrations). Initial migration: `apps/api/prisma/migrations/0001_init`.
 
@@ -15,7 +19,7 @@ erDiagram
   Vehicle ||--o{ User : "driven by"
   User ||--o{ Order : creates
   Order ||--|{ OrderLine : contains
-  Order ||--o| TripStop : "assigned to"
+  Order ||--o{ TripStop : "historical attempts"
   Trip ||--|{ TripStop : "ordered stops"
   Trip ||--o| LoadingRecord : "loaded via"
   LoadingRecord ||--o{ LoadingIssue : raises
@@ -37,7 +41,7 @@ erDiagram
   Order { string id PK string outletId FK date requestedDate date plannedDate TempRequirement temp int units float weightKg float volumeM3 OrderStatus status int deferralCount string deferReason date deferredToDate }
   OrderLine { string id PK string orderId FK string item int requestedQty int loadedQty int deliveredQty }
   Trip { string id PK string vehicleId FK date date int tripNo "unique per vehicle+date" TripStatus status float totalWeightKg float totalVolumeM3 }
-  TripStop { string id PK string tripId FK string orderId UK int sequence string etaTime StopStatus status }
+  TripStop { string id PK string tripId FK string orderId FK boolean active int sequence string etaTime StopStatus status }
   LoadingRecord { string id PK string tripId UK string checkedById FK LoadingRecordStatus status }
   LoadingIssue { string id PK LoadingIssueType type int expectedQty int availableQty string decision LoadingIssueStatus status }
   Delivery { string id PK string stopId UK StopStatus outcome string reason string clientActionId UK }
@@ -52,11 +56,11 @@ erDiagram
 
 | Rule | Where |
 |---|---|
-| A vehicle runs at most two numbered trips per day | `Trip @@unique([vehicleId, date, tripNo])`; the 2-trip cap itself is enforced by the planning service |
-| An order is on at most one active stop | `TripStop.orderId @unique` |
+| A vehicle runs at most two numbered trips per day | Partial unique index on unreleased `(vehicleId, date, tripNo)`, SQL slot check 1/2, and planning validation |
+| An order is on at most one active stop | Partial unique index on `TripStop.orderId WHERE active` |
 | Stop sequence is unique within a trip | `TripStop @@unique([tripId, sequence])` |
-| Offline actions are idempotent | `SyncAction.clientActionId @unique`, `Delivery.clientActionId @unique` |
-| Failed outcome is kept; recovery is recorded separately | `Delivery.outcome` + `AuditEvent` history |
+| Offline actions are idempotent | Planning uses actor-scoped `MutationRecord` with payload hash/result; field-sync handlers still need integration |
+| Failed outcome is kept; recovery is recorded separately | `Delivery.outcome`, `RecoveryDecision`, per-attempt `TripStopLine` and audit history |
 | Evidence is stored as references, not browser preview URLs | `ProofOfDelivery.signatureRef/photoRef`, `ReceiptIssue.photoRef` |
 
 ## Status enums
