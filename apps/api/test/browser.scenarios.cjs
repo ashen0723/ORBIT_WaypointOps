@@ -144,11 +144,124 @@ module.exports = async ({ db, base }) => {
       .getByRole("button", { name: "Start loading", exact: true })
       .click();
     await committed();
+    // The mounted Loader surface saves actual issue evidence, not a preview flag.
+    await loader
+      .getByText("Report damaged or missing stock with photo", { exact: true })
+      .click();
+    const photoForm = loader
+      .locator("form")
+      .filter({
+        has: loader.getByRole("button", {
+          name: "Report loading issue",
+          exact: true,
+        }),
+      });
+    await photoForm.getByLabel("Issue type").selectOption("DAMAGED");
+    await photoForm.getByLabel("Available quantity").fill("2");
+    await photoForm
+      .getByLabel("Issue note")
+      .fill("One carton damaged; replacement needed");
+    const png = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aR9sAAAAASUVORK5CYII=",
+      "base64",
+    );
+    await photoForm
+      .getByLabel("Issue photo (optional)")
+      .setInputFiles({
+        name: "damage.png",
+        mimeType: "image/png",
+        buffer: png,
+      });
+    await photoForm
+      .getByRole("button", { name: "Report loading issue", exact: true })
+      .click();
+    await expect(
+      loader.getByText("Issue history and evidence", { exact: true }),
+    ).toBeVisible();
+    await loader.getByRole("link", { name: "Issues", exact: true }).click();
+    await expect(
+      loader.getByRole("heading", { name: "Loading issues", exact: true }),
+    ).toBeVisible();
+    await loader
+      .getByText("Issue history and evidence", { exact: true })
+      .click();
+    await expect(
+      loader.getByRole("img", { name: "Delivery evidence 1" }),
+    ).toBeVisible();
+    const issue = await db.loadingIssue.findFirstOrThrow({
+      where: { orderLineId: order.lines[0].id },
+      include: { loadingRecord: true },
+    });
+    assert.equal(issue.photoRefs.length, 1);
+    assert.equal(
+      Buffer.from(
+        (
+          await db.evidence.findUniqueOrThrow({
+            where: { id: issue.photoRefs[0] },
+          })
+        ).bytes,
+      ).compare(png),
+      0,
+    );
+    await loader
+      .getByText("Loading checks & shortfalls", { exact: true })
+      .click();
+    await loader
+      .getByRole("button", { name: "Mark ready for departure" })
+      .click();
+    await expect(loader.getByRole("alert")).toContainText(
+      "Acknowledge the current plan",
+    );
+    const dispatcherToken = await dispatcher.evaluate(
+      () => JSON.parse(sessionStorage.getItem("waypoint.live.session")).token,
+    );
+    const loadingTrip = await db.trip.findUniqueOrThrow({
+      where: { id: issue.loadingRecord.tripId },
+    });
+    const decision = await fetch(
+      `${base}/api/loading/issues/${issue.id}/decision`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${dispatcherToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          clientActionId: "browser-loader-replacement",
+          expectedVersion: issue.version,
+          expectedPlanVersion: loadingTrip.planVersion,
+          decision: {
+            action: "REPLACEMENT_REQUIRED",
+            reason: "Load an identical replacement",
+          },
+        }),
+      },
+    );
+    assert.equal(decision.status, 200, await decision.text());
+    await loader
+      .getByRole("link", { name: "Loading queue", exact: true })
+      .click();
+    await loader.getByRole("button", { name: "Refresh", exact: true }).click();
+    await expect(
+      loader.getByRole("button", { name: "Refresh", exact: true }),
+    ).toBeEnabled();
+    await expect(
+      loader.getByText("Loading checks & shortfalls", { exact: true }),
+    ).toBeVisible();
     // A committed version remounts the card; reopen its collapsed check panel.
     await loader
       .getByText("Loading checks & shortfalls", { exact: true })
       .click();
     await loader.getByRole("button", { name: "Save checked quantity" }).click();
+    await committed();
+    await loader
+      .getByText("Loading checks & shortfalls", { exact: true })
+      .click();
+    await loader
+      .getByRole("button", {
+        name: "Acknowledge decision after checking goods",
+      })
+      .click();
     await committed();
     await loader
       .getByText("Loading checks & shortfalls", { exact: true })
@@ -166,6 +279,27 @@ module.exports = async ({ db, base }) => {
     await expect(
       loader.getByRole("heading", { name: /Trip 1 · READY/ }),
     ).toBeVisible();
+    await loader
+      .getByRole("link", { name: "Completed loads", exact: true })
+      .click();
+    await expect(
+      loader.getByRole("heading", { name: "Completed loads", exact: true }),
+    ).toBeVisible();
+    await loader.getByRole("link", { name: "Open trip", exact: true }).click();
+    await loader
+      .getByText("Stop sequence and loading list", { exact: true })
+      .click();
+    await loader.setViewportSize({ width: 390, height: 844 });
+    await loader.screenshot({
+      path: "/private/tmp/waypoint-loader-mobile.png",
+      fullPage: true,
+    });
+    assert.ok(
+      await loader.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth + 1,
+      ),
+    );
+    await loader.setViewportSize({ width: 1280, height: 900 });
     const driver = pages.driver;
     await driver.getByRole("button", { name: "Refresh", exact: true }).click();
     await driver.getByRole("button", { name: "Depart", exact: true }).click();
@@ -226,7 +360,18 @@ module.exports = async ({ db, base }) => {
       await db.delivery.count({ where: { stop: { orderId: order.id } } }),
       1,
     );
-    assert.equal(await db.evidence.count({ where: { orderId: order.id } }), 1);
+    assert.equal(
+      await db.evidence.count({
+        where: { orderId: order.id, ownerId: "driver" },
+      }),
+      1,
+    );
+    assert.equal(
+      await db.evidence.count({
+        where: { orderId: order.id, ownerId: "loader" },
+      }),
+      1,
+    );
     assert.deepEqual(errors, []);
     await require("./dispatcher-browser.scenarios.cjs")({
       db,

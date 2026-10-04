@@ -4,9 +4,10 @@ import { AuthProvider, useAuth } from './providers/AuthProvider';
 import { RoleRouter, type RoleModules } from './RoleRouter';
 import { Login } from '../features/dispatcher/pages/Login';
 import { DispatcherApp } from '../features/dispatcher/live/DispatcherApp';
+import { App as LoaderApp } from '../features/loader/App';
 import { OperationsApp } from '../features/operations/OperationsApp';
 
-const ROLE_MODULES: RoleModules = { dispatcher: DispatcherApp, store_manager: OperationsApp, loader: OperationsApp, driver: OperationsApp };
+const ROLE_MODULES: RoleModules = { dispatcher: DispatcherApp, store_manager: OperationsApp, loader: LoaderApp, driver: OperationsApp };
 
 const LOGIN_TREE = (
   <BrowserRouter>

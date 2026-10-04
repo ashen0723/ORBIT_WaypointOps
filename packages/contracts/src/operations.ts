@@ -43,6 +43,8 @@ export interface LoadingDecisionRequest extends VersionedMutation {
   decision: LoadingDecision;
 }
 export interface LoadingIssueView {
+  note?: string | null;
+  photoRefs?: Id[];
   id: Id;
   version: number;
   tripId: Id;

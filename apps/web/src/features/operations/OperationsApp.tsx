@@ -43,7 +43,7 @@ const today = () =>
 const uid = () => crypto.randomUUID();
 const value = (f: FormData, name: string) => String(f.get(name) ?? "");
 const number = (f: FormData, name: string) => Number(value(f, name));
-function Field({
+export function Field({
   name,
   label,
   type = "text",
@@ -70,7 +70,7 @@ function Field({
   );
 }
 /** Keep the same action key on a retry of unchanged form values. */
-function ActionForm({
+export function ActionForm({
   title,
   children,
   onSubmit,
@@ -744,7 +744,7 @@ export function OperationsApp() {
     </div>
   );
 }
-function Loading({
+export function Loading({
   trip,
   role,
   call,

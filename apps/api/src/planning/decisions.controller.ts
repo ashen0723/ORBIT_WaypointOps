@@ -4,18 +4,8 @@ import { DecisionsService } from './decisions.service';
 @Controller() @UseGuards(AuthGuard)
 export class DecisionsController {
   constructor(private readonly decisions: DecisionsService) {}
-  @Get('trips/:id/loading') @Roles('LOADER', 'DISPATCHER')
-  loading(@Req() req: AuthRequest, @Param('id') id: string) { return this.decisions.getLoading(req.user, id); }
-  @Post('loading/:id/start') @HttpCode(200) @Roles('LOADER')
-  start(@Req() req: AuthRequest, @Param('id') id: string, @Body() body: unknown) { return this.decisions.startLoading(req.user, id, body); }
-  @Patch('loading/:id/lines/:lineId') @Roles('LOADER')
-  line(@Req() req: AuthRequest, @Param('id') id: string, @Param('lineId') lineId: string, @Body() body: unknown) { return this.decisions.loadLine(req.user, id, lineId, body); }
-  @Post('loading/:id/issues') @Roles('LOADER')
-  report(@Req() req: AuthRequest, @Param('id') id: string, @Body() body: unknown) { return this.decisions.reportIssue(req.user, id, body); }
   @Post('loading/issues/:id/decision') @HttpCode(200) @Roles('DISPATCHER')
   decision(@Req() req: AuthRequest, @Param('id') id: string, @Body() body: unknown) { return this.decisions.decideShortfall(req.user, id, body); }
-  @Post('loading/issues/:id/acknowledge') @HttpCode(200) @Roles('LOADER')
-  acknowledge(@Req() req: AuthRequest, @Param('id') id: string, @Body() body: unknown) { return this.decisions.acknowledgeIssue(req.user, id, body); }
   @Get('deliveries/:id/recovery') @Roles('DISPATCHER')
   recoveryState(@Param('id') id:string){return this.decisions.recoveryState(id);}
   @Post('deliveries/:id/recovery') @Roles('DISPATCHER')

@@ -1,10 +1,9 @@
-import { Module } from '@nestjs/common';
-import { LoadingController } from './loading.controller';
-import { LoadingService } from './loading.service';
-
+import { Module } from "@nestjs/common";
+import { AuthModule } from "../auth/auth.module";
+import { PlanningModule } from "../planning/planning.module";
+import { LoadingController } from "./loading.controller";
 @Module({
+  imports: [AuthModule, PlanningModule],
   controllers: [LoadingController],
-  providers: [LoadingService],
-  exports: [LoadingService],
 })
 export class LoadingModule {}

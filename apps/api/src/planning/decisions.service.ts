@@ -27,7 +27,7 @@ export class DecisionsService {
   }
   private issueView(issue: LoadingIssue, trip: { id: string; planVersion: number }): LoadingIssueView {
     return { id: issue.id, version: issue.version, tripId: trip.id, planVersion: trip.planVersion, orderLineId: issue.orderLineId,
-      type: issue.type, expectedQty: issue.expectedQty, availableQty: issue.availableQty, status: issue.status,
+      note: issue.note, photoRefs: issue.photoRefs, type: issue.type, expectedQty: issue.expectedQty, availableQty: issue.availableQty, status: issue.status,
       decision: issue.decisionData as LoadingDecision | null, decidedById: issue.decidedById, decidedAt: issue.decidedAt?.toISOString() ?? null,
       acknowledgedById: issue.acknowledgedById, acknowledgedAt: issue.acknowledgedAt?.toISOString() ?? null, cancelledQty: issue.cancelledQty };
   }
