@@ -7,7 +7,9 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import type {
   LoaderQueueStatus,
+  CreateLoadingIssueBody,
   LoadedQuantityResult,
+  LoadingIssueResult,
   LoadingStartResult,
   LoaderTripDetail,
   LoaderTripSummary,
@@ -180,6 +182,7 @@ export class LoadingService {
         expectedQty: issue.expectedQty,
         availableQty: issue.availableQty,
         note: issue.note,
+        evidenceRef: issue.evidenceRef,
         decision: issue.decision,
         status: issue.status,
         createdAt: issue.createdAt.toISOString(),
@@ -352,6 +355,128 @@ export class LoadingService {
         expectedQty: updatedLine.requestedQty,
         loadedQty: updatedLine.loadedQty ?? 0,
         complete: updatedLine.loadedQty === updatedLine.requestedQty,
+      };
+    });
+  }
+
+  async reportIssue(
+    tripId: string,
+    body: CreateLoadingIssueBody,
+    loader: { id: string; depotId: string },
+  ): Promise<LoadingIssueResult> {
+    if (!body || !['MISSING', 'DAMAGED'].includes(body.type)) {
+      throw new BadRequestException('type must be MISSING or DAMAGED.');
+    }
+
+    if (!body.orderLineId?.trim()) {
+      throw new BadRequestException('orderLineId is required.');
+    }
+
+    if (!Number.isInteger(body.availableQty) || body.availableQty < 0) {
+      throw new BadRequestException('availableQty must be a non-negative whole number.');
+    }
+
+    const line = await this.prisma.orderLine.findUnique({
+      where: { id: body.orderLineId },
+      include: {
+        order: {
+          include: {
+            stop: {
+              include: {
+                trip: {
+                  include: { loadingRecord: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    const trip = line?.order.stop?.trip;
+
+    if (!line || !trip || trip.id !== tripId || trip.depotId !== loader.depotId) {
+      throw new NotFoundException('Order line not found in this loading trip.');
+    }
+
+    const loadingRecord = trip.loadingRecord;
+
+    if (trip.status !== 'LOADING' || loadingRecord?.status !== 'IN_PROGRESS') {
+      throw new ConflictException('Issues can only be reported while loading is in progress.');
+    }
+
+    if (body.availableQty >= line.requestedQty) {
+      throw new BadRequestException(
+        `availableQty must be below the expected quantity of ${line.requestedQty}.`,
+      );
+    }
+
+    const existingIssue = await this.prisma.loadingIssue.findFirst({
+      where: {
+        loadingRecordId: loadingRecord.id,
+        orderLineId: line.id,
+        status: 'OPEN',
+      },
+      select: { id: true },
+    });
+
+    if (existingIssue) {
+      throw new ConflictException('This order line already has an open loading issue.');
+    }
+
+    const note = body.note?.trim() || null;
+    const evidenceRef = body.evidenceRef?.trim() || null;
+
+    return this.prisma.$transaction(async (transaction) => {
+      await transaction.orderLine.update({
+        where: { id: line.id },
+        data: { loadedQty: body.availableQty },
+      });
+
+      const issue = await transaction.loadingIssue.create({
+        data: {
+          loadingRecordId: loadingRecord.id,
+          orderLineId: line.id,
+          type: body.type,
+          expectedQty: line.requestedQty,
+          availableQty: body.availableQty,
+          note,
+          evidenceRef,
+          status: 'OPEN',
+        },
+      });
+
+      await transaction.auditEvent.create({
+        data: {
+          actorId: loader.id,
+          entityType: 'LoadingIssue',
+          entityId: issue.id,
+          action: 'LOADING_ISSUE_REPORTED',
+          payload: {
+            tripId,
+            orderLineId: line.id,
+            type: body.type,
+            expectedQty: line.requestedQty,
+            availableQty: body.availableQty,
+            shortfallQty: line.requestedQty - body.availableQty,
+            evidenceRef,
+          },
+        },
+      });
+
+      return {
+        issueId: issue.id,
+        tripId,
+        loadingRecordId: issue.loadingRecordId,
+        orderLineId: issue.orderLineId,
+        type: issue.type,
+        expectedQty: issue.expectedQty,
+        availableQty: issue.availableQty,
+        shortfallQty: issue.expectedQty - issue.availableQty,
+        note: issue.note,
+        evidenceRef: issue.evidenceRef,
+        status: issue.status,
+        decision: issue.decision,
+        createdAt: issue.createdAt.toISOString(),
       };
     });
   }

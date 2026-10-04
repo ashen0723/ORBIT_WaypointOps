@@ -1,7 +1,9 @@
 import { Body, Controller, Param, Patch, Post, Req } from '@nestjs/common';
 import { LoadingService } from './loading.service';
 import type {
+  CreateLoadingIssueBody,
   LoadedQuantityResult,
+  LoadingIssueResult,
   LoadingStartResult,
   UpdateLoadedQuantityBody,
 } from './loading.types';
@@ -28,5 +30,15 @@ export class LoadingOperationsController {
   ): Promise<LoadedQuantityResult> {
     const loader = requireLoader(request);
     return this.loadingService.updateLoadedQuantity(lineId, body?.loadedQty, loader);
+  }
+
+  @Post(':tripId/issues')
+  reportIssue(
+    @Param('tripId') tripId: string,
+    @Body() body: CreateLoadingIssueBody,
+    @Req() request: AuthenticatedLoaderRequest,
+  ): Promise<LoadingIssueResult> {
+    const loader = requireLoader(request);
+    return this.loadingService.reportIssue(tripId, body, loader);
   }
 }

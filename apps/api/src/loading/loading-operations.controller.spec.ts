@@ -4,14 +4,17 @@ import { LoadingOperationsController } from './loading-operations.controller';
 describe('LoadingOperationsController', () => {
   const startLoading = jest.fn();
   const updateLoadedQuantity = jest.fn();
+  const reportIssue = jest.fn();
   const controller = new LoadingOperationsController({
     startLoading,
     updateLoadedQuantity,
+    reportIssue,
   } as unknown as LoadingService);
 
   beforeEach(() => {
     startLoading.mockReset();
     updateLoadedQuantity.mockReset();
+    reportIssue.mockReset();
   });
 
   it('starts loading as the authenticated Loader', async () => {
@@ -34,6 +37,22 @@ describe('LoadingOperationsController', () => {
     })).resolves.toEqual({ orderLineId: 'LINE-1', loadedQty: 16 });
 
     expect(updateLoadedQuantity).toHaveBeenCalledWith('LINE-1', 16, {
+      id: 'USR-LDR', role: 'LOADER', depotId: 'DEP-PLG',
+    });
+  });
+
+  it('reports a loading issue as the authenticated Loader', async () => {
+    reportIssue.mockResolvedValue({ issueId: 'ISSUE-1' });
+    const body = {
+      orderLineId: 'LINE-1', type: 'MISSING' as const, availableQty: 16,
+      note: 'Four cases unavailable', evidenceRef: 'uploads/issues/photo.jpg',
+    };
+
+    await expect(controller.reportIssue('TRIP-1', body, {
+      user: { id: 'USR-LDR', role: 'LOADER', depotId: 'DEP-PLG' },
+    })).resolves.toEqual({ issueId: 'ISSUE-1' });
+
+    expect(reportIssue).toHaveBeenCalledWith('TRIP-1', body, {
       id: 'USR-LDR', role: 'LOADER', depotId: 'DEP-PLG',
     });
   });

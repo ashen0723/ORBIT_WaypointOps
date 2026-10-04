@@ -303,6 +303,7 @@ model LoadingIssue {
   expectedQty     Int
   availableQty    Int
   note            String?
+  evidenceRef     String?
   decision        String? // dispatcher decision text
   status          LoadingIssueStatus @default(OPEN)
   createdAt       DateTime           @default(now())

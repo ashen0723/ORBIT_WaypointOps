@@ -91,7 +91,8 @@ describe('LoadingService', () => {
         startedAt: new Date('2026-10-05T04:30:00.000Z'), completedAt: null,
         issues: [{
           id: 'ISSUE-1', orderLineId: 'LINE-1', type: 'MISSING', expectedQty: 20,
-          availableQty: 16, note: 'Four unavailable', decision: null, status: 'OPEN',
+          availableQty: 16, note: 'Four unavailable', evidenceRef: null,
+          decision: null, status: 'OPEN',
           createdAt: new Date('2026-10-05T04:40:00.000Z'),
           updatedAt: new Date('2026-10-05T04:40:00.000Z'),
         }],
@@ -311,5 +312,98 @@ describe('LoadingService', () => {
     await expect(quantityService.updateLoadedQuantity('LINE-1', 20, {
       id: 'USR-LDR', depotId: 'DEP-PLG',
     })).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('reports a persisted shortfall and updates the actual loaded quantity', async () => {
+    const findUnique = jest.fn().mockResolvedValue({
+      id: 'LINE-1', requestedQty: 20, loadedQty: 20,
+      order: {
+        stop: {
+          trip: {
+            id: 'TRIP-1', depotId: 'DEP-PLG', status: 'LOADING',
+            loadingRecord: { id: 'LOAD-1', status: 'IN_PROGRESS' },
+          },
+        },
+      },
+    });
+    const findIssue = jest.fn().mockResolvedValue(null);
+    const updateLine = jest.fn().mockResolvedValue({});
+    const createIssue = jest.fn().mockResolvedValue({
+      id: 'ISSUE-1', loadingRecordId: 'LOAD-1', orderLineId: 'LINE-1',
+      type: 'MISSING', expectedQty: 20, availableQty: 16,
+      note: 'Four cases unavailable', evidenceRef: 'uploads/issues/photo.jpg',
+      status: 'OPEN', decision: null, createdAt: new Date('2026-10-05T04:45:00.000Z'),
+    });
+    const createAudit = jest.fn().mockResolvedValue({});
+    const transaction = jest.fn(async (callback) => callback({
+      orderLine: { update: updateLine },
+      loadingIssue: { create: createIssue },
+      auditEvent: { create: createAudit },
+    }));
+    const issueService = new LoadingService({
+      orderLine: { findUnique }, loadingIssue: { findFirst: findIssue },
+      $transaction: transaction,
+    } as unknown as PrismaService);
+
+    await expect(issueService.reportIssue('TRIP-1', {
+      orderLineId: 'LINE-1', type: 'MISSING', availableQty: 16,
+      note: ' Four cases unavailable ', evidenceRef: ' uploads/issues/photo.jpg ',
+    }, { id: 'USR-LDR', depotId: 'DEP-PLG' })).resolves.toMatchObject({
+      issueId: 'ISSUE-1', expectedQty: 20, availableQty: 16,
+      shortfallQty: 4, status: 'OPEN', evidenceRef: 'uploads/issues/photo.jpg',
+    });
+
+    expect(updateLine).toHaveBeenCalledWith({
+      where: { id: 'LINE-1' }, data: { loadedQty: 16 },
+    });
+    expect(createIssue).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        loadingRecordId: 'LOAD-1', type: 'MISSING', expectedQty: 20,
+        availableQty: 16, note: 'Four cases unavailable',
+        evidenceRef: 'uploads/issues/photo.jpg', status: 'OPEN',
+      }),
+    });
+  });
+
+  it('rejects an issue when available quantity is not a shortfall', async () => {
+    const findUnique = jest.fn().mockResolvedValue({
+      id: 'LINE-1', requestedQty: 20, loadedQty: 20,
+      order: {
+        stop: {
+          trip: {
+            id: 'TRIP-1', depotId: 'DEP-PLG', status: 'LOADING',
+            loadingRecord: { id: 'LOAD-1', status: 'IN_PROGRESS' },
+          },
+        },
+      },
+    });
+    const issueService = new LoadingService({
+      orderLine: { findUnique },
+    } as unknown as PrismaService);
+
+    await expect(issueService.reportIssue('TRIP-1', {
+      orderLineId: 'LINE-1', type: 'DAMAGED', availableQty: 20,
+    }, { id: 'USR-LDR', depotId: 'DEP-PLG' })).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('rejects a second open issue for the same line', async () => {
+    const findUnique = jest.fn().mockResolvedValue({
+      id: 'LINE-1', requestedQty: 20, loadedQty: 16,
+      order: {
+        stop: {
+          trip: {
+            id: 'TRIP-1', depotId: 'DEP-PLG', status: 'LOADING',
+            loadingRecord: { id: 'LOAD-1', status: 'IN_PROGRESS' },
+          },
+        },
+      },
+    });
+    const issueService = new LoadingService({
+      orderLine: { findUnique }, loadingIssue: { findFirst: jest.fn().mockResolvedValue({ id: 'ISSUE-1' }) },
+    } as unknown as PrismaService);
+
+    await expect(issueService.reportIssue('TRIP-1', {
+      orderLineId: 'LINE-1', type: 'MISSING', availableQty: 15,
+    }, { id: 'USR-LDR', depotId: 'DEP-PLG' })).rejects.toMatchObject({ status: 409 });
   });
 });

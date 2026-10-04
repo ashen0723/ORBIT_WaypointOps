@@ -93,6 +93,7 @@ export interface LoaderTripDetail {
     expectedQty: number;
     availableQty: number;
     note: string | null;
+    evidenceRef: string | null;
     decision: string | null;
     status: string;
     createdAt: string;
@@ -120,4 +121,28 @@ export interface LoadedQuantityResult {
   expectedQty: number;
   loadedQty: number;
   complete: boolean;
+}
+
+export interface CreateLoadingIssueBody {
+  orderLineId: string;
+  type: 'MISSING' | 'DAMAGED';
+  availableQty: number;
+  note?: string;
+  evidenceRef?: string;
+}
+
+export interface LoadingIssueResult {
+  issueId: string;
+  tripId: string;
+  loadingRecordId: string;
+  orderLineId: string;
+  type: string;
+  expectedQty: number;
+  availableQty: number;
+  shortfallQty: number;
+  note: string | null;
+  evidenceRef: string | null;
+  status: string;
+  decision: string | null;
+  createdAt: string;
 }
