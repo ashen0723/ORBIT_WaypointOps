@@ -37,3 +37,65 @@ export interface LoaderTripSummary {
     etaTime: string | null;
   }>;
 }
+
+export interface LoaderTripDetail {
+  tripId: string;
+  vehicleId: string;
+  tripNo: number;
+  date: string;
+  plannedDeparture: string | null;
+  tripStatus: string;
+  plannedWeightKg: number;
+  plannedVolumeM3: number;
+  vehicle: LoaderTripSummary['vehicle'];
+  loadingRecord: {
+    id: string;
+    status: string;
+    checkedById: string;
+    startedAt: string | null;
+    completedAt: string | null;
+  } | null;
+  stops: Array<{
+    tripStopId: string;
+    sequence: number;
+    etaTime: string | null;
+    order: {
+      orderId: string;
+      temperature: string;
+      weightKg: number;
+      volumeM3: number;
+      outlet: {
+        outletId: string;
+        name: string;
+        district: string;
+        brand: string;
+        dockType: string;
+        parkingConstraint: string;
+        deliveryWindow: {
+          opensAt: string;
+          closesAt: string;
+          mallWindow: string | null;
+        };
+      };
+      lines: Array<{
+        orderLineId: string;
+        item: string;
+        unit: string;
+        expectedQty: number;
+        loadedQty: number;
+      }>;
+    };
+  }>;
+  issues: Array<{
+    issueId: string;
+    orderLineId: string;
+    type: string;
+    expectedQty: number;
+    availableQty: number;
+    note: string | null;
+    decision: string | null;
+    status: string;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+}

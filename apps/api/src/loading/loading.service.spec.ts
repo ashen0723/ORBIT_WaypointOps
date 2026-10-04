@@ -79,4 +79,62 @@ describe('LoadingService', () => {
     const [trip] = await service.listPublishedTrips('DEP-PLG');
     expect(trip).toMatchObject({ status: 'AWAITING_DISPATCHER', openIssueCount: 1 });
   });
+
+  it('returns ordered loading detail with actual quantities and issues', async () => {
+    const findFirst = jest.fn().mockResolvedValue({
+      id: 'TRIP-1', vehicleId: 'TRK-021', tripNo: 1,
+      date: new Date('2026-10-05T00:00:00.000Z'), plannedDeparture: '05:30', status: 'LOADING',
+      totalWeightKg: 640, totalVolumeM3: 8.5,
+      vehicle: { type: 'TRUCK', temp: 'REEFER', weightCapKg: 1000, volumeCapM3: 18 },
+      loadingRecord: {
+        id: 'LOAD-1', status: 'IN_PROGRESS', checkedById: 'USR-LDR',
+        startedAt: new Date('2026-10-05T04:30:00.000Z'), completedAt: null,
+        issues: [{
+          id: 'ISSUE-1', orderLineId: 'LINE-1', type: 'MISSING', expectedQty: 20,
+          availableQty: 16, note: 'Four unavailable', decision: null, status: 'OPEN',
+          createdAt: new Date('2026-10-05T04:40:00.000Z'),
+          updatedAt: new Date('2026-10-05T04:40:00.000Z'),
+        }],
+      },
+      stops: [{
+        id: 'STOP-1', sequence: 1, etaTime: '06:15',
+        order: {
+          id: 'ORD-1', outletId: 'OUT-001', temp: 'CHILLED', weightKg: 120, volumeM3: 2.5,
+          outlet: {
+            id: 'OUT-001', name: 'FreshMart Colombo 05', district: 'Colombo', brand: 'FRESH',
+            dockType: 'REAR_DOCK', parkingConstraint: 'NORMAL',
+            windowOpenTime: '04:00', windowCloseTime: '08:00', mallWindow: null,
+          },
+          lines: [{
+            id: 'LINE-1', item: 'Milk cases', unit: 'cases', requestedQty: 20, loadedQty: 16,
+          }],
+        },
+      }],
+    });
+    const detailService = new LoadingService({ trip: { findFirst } } as unknown as PrismaService);
+
+    await expect(detailService.getLoadingTrip('TRIP-1', 'DEP-PLG')).resolves.toMatchObject({
+      tripId: 'TRIP-1',
+      loadingRecord: { id: 'LOAD-1', status: 'IN_PROGRESS' },
+      stops: [{ order: { lines: [{ orderLineId: 'LINE-1', expectedQty: 20, loadedQty: 16 }] } }],
+      issues: [{ issueId: 'ISSUE-1', status: 'OPEN', availableQty: 16 }],
+    });
+
+    expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        id: 'TRIP-1',
+        depotId: 'DEP-PLG',
+        status: { in: ['CONFIRMED', 'LOADING', 'READY'] },
+      },
+    }));
+  });
+
+  it('does not reveal an unpublished or other-depot trip', async () => {
+    const findFirst = jest.fn().mockResolvedValue(null);
+    const detailService = new LoadingService({ trip: { findFirst } } as unknown as PrismaService);
+
+    await expect(detailService.getLoadingTrip('TRIP-OTHER', 'DEP-PLG')).rejects.toMatchObject({
+      status: 404,
+    });
+  });
 });
