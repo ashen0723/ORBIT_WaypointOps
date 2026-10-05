@@ -131,7 +131,7 @@ export function ConfirmReceipt() {
         } />
       
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)] lg:items-start">
+      <div className="mt-6 grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)] xl:items-start">
         <ProofOfDelivery order={order} />
 
         <Card className="overflow-hidden">

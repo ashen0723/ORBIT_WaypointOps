@@ -13,7 +13,7 @@ export function ProofOfDelivery({ order }: {order: Order;}) {
   const driver = order.vehicle?.driver ?? 'Driver';
 
   if (live) return (
-    <Card className="p-4 md:p-6 lg:sticky lg:top-24">
+    <Card className="p-4 md:p-6 xl:sticky xl:top-24">
       <h2 className="text-base font-semibold text-ink">Driver’s proof of delivery</h2>
       <p className="mt-3 text-sm text-subtle">Delivered at {time}. Check the quantities recorded by the driver against what arrived.</p>
       {order.arrivedAt && <p className="mt-3 text-sm text-ink">Arrival time: {order.arrivedAt}</p>}
@@ -25,7 +25,7 @@ export function ProofOfDelivery({ order }: {order: Order;}) {
   );
 
   return (
-    <Card className="p-4 md:p-6 lg:sticky lg:top-24">
+    <Card className="p-4 md:p-6 xl:sticky xl:top-24">
       <h2 className="text-base font-semibold text-ink">Driver’s proof of delivery</h2>
       <figure className="mt-4">
         <img src={POD_PHOTO} alt="Wrapped pallet of cases left inside the outlet's receiving door" className="aspect-[4/3] w-full rounded-lg object-cover" />
