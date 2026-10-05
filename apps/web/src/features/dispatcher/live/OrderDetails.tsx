@@ -306,6 +306,14 @@ function DeliverySummary({ delivery: d }: { delivery: DeliveryView }) {
               ? "No receipt: no handover"
               : "Awaiting Store receipt"}
       </p>
+      {receipt.data?.lines
+        .filter((l) => l.damagedQty > 0 || l.missingQty > 0)
+        .map((l) => (
+          <p key={l.orderLineId} role="note">
+            Store reported {l.damagedQty} damaged · {l.missingQty} missing
+            {l.note ? ` — “${l.note}”` : ""}
+          </p>
+        ))}
     </article>
   );
 }
