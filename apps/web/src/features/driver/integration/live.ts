@@ -329,7 +329,7 @@ export class LiveDriverIntegration implements DriverIntegration {
     }
     const vehicle = this.profile?.vehicle;
     const assignment: DriverIdentity = {
-      name: this.deps.user.name, email: this.deps.user.email, avatar: '/58c66d11-4505-4e4e-88a9-0abccd947006.jpg',
+      name: this.deps.user.name, email: this.deps.user.email, avatar: '',
       vehicle: vehicle?.id ?? 'No vehicle assigned', vehicleType: vehicle ? `${vehicle.type.toLowerCase()} · ${vehicle.temp.toLowerCase()}` : '',
       depot: district, date: '',
     };

@@ -134,6 +134,7 @@ export class FieldService {
       const trip = await this.planning.loadTrip(tx, id);
       if (trip.driverId !== actor.id || actor.vehicleId !== trip.vehicleId)
         fail(403, "FORBIDDEN", "Only the assigned Driver can depart.");
+      await this.planning.requireVehicleAvailable(tx, trip);
       if (trip.planVersion !== expected)
         fail(409, "STALE_PLAN", "Refresh the current plan.");
       if (

@@ -173,6 +173,11 @@ async function main() {
       "../prisma/dataset-import.ts",
       __filename,
     );
+    // The seed now includes a rolling calendar. Pick an unseeded date so
+    // the importer test keeps asserting three creations regardless of today's date.
+    const lastOperatingDay = await db.operatingDay.findFirstOrThrow({ orderBy: { date: "desc" } });
+    const importDate = new Date(lastOperatingDay.date);
+    importDate.setUTCDate(importDate.getUTCDate() + 7);
     const rows = {
       outlets: {
         id: "SRC-STYLE",
@@ -199,7 +204,7 @@ async function main() {
         depotId: "DEP-PLG",
         available: true,
       },
-      calendar: { date: "2026-11-04", operating: true },
+      calendar: { date: importDate.toISOString().slice(0, 10), operating: true },
     };
     const mapping = { version: 1, datasets: {} };
     for (const dataset of Object.keys(rows)) {

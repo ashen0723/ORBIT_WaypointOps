@@ -17,6 +17,8 @@
     "test:contracts": "npm run typecheck -w packages/contracts",
     "test": "npm run test:contracts && npm test -w apps/web && npm test -w apps/api",
     "test:e2e": "npm run build && BROWSER_E2E=1 node apps/api/test/planning.integration.cjs --postgres",
-    "typecheck": "npm run test:contracts && npm run typecheck -w apps/web"
+    "typecheck": "npm run test:contracts && npm run typecheck -w apps/web",
+    "test:demo": "npm run build && DEMO_BROWSER_E2E=1 node apps/api/test/planning.integration.cjs --postgres",
+    "test:e2e:all": "npm run build && BROWSER_E2E=1 STORE_BROWSER_E2E=1 DISPATCHER_UI_E2E=1 DEMO_BROWSER_E2E=1 node apps/api/test/planning.integration.cjs --postgres"
   }
 }

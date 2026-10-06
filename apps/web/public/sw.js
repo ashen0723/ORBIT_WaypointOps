@@ -1,5 +1,6 @@
 /* Only the public application shell is cached. Authenticated API responses never enter CacheStorage. */
 const SHELL = "waypoint-shell-v1";
+const PUBLIC_IMAGES = ["/Blue_Simple_Delivery_Truck_Logo.png"];
 self.addEventListener("install", (event) =>
   event.waitUntil(
     (async () => {
@@ -11,7 +12,7 @@ self.addEventListener("install", (event) =>
       const assets = [
         ...html.matchAll(/(?:src|href)="(\/assets\/[^\"]+)"/g),
       ].map((match) => match[1]);
-      await cache.addAll(assets);
+      await cache.addAll([...assets, ...PUBLIC_IMAGES]);
       await self.skipWaiting();
     })(),
   ),
@@ -31,7 +32,7 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(event.request).catch(() => caches.match("/index.html")),
     );
-  else if (url.pathname.startsWith("/assets/"))
+  else if (url.pathname.startsWith("/assets/") || PUBLIC_IMAGES.includes(url.pathname))
     event.respondWith(
       caches
         .match(event.request)

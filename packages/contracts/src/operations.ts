@@ -62,7 +62,7 @@ export interface LoadingIssueView {
   cancelledQty: number;
 }
 export interface AcknowledgeLoadingIssueRequest extends VersionedMutation { expectedPlanVersion: number }
-export interface LoadingView { trip: TripView; issues: LoadingIssueView[] }
+export interface LoadingView { trip: TripView; issues: LoadingIssueView[]; vehicleAvailable?: boolean }
 
 /** Uploaded, access-controlled durable references; never blob: URLs. */
 export type ReceiverProof =
