@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { ArrowRightIcon, CircleCheckIcon, ClockIcon, Loader2Icon, TriangleAlertIcon } from 'lucide-react';
 import { useOrders } from '../contexts/OrdersContext';
 import { PageContainer } from '../components/ui/PageContainer';
+import { GreenSelect } from '../components/ui/GreenSelect';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
@@ -166,20 +167,9 @@ export function DeferralNotice() {
               <label htmlFor="req-reason" className="text-sm font-semibold text-ink">
                 Reason <span className="text-danger-ink">*</span>
               </label>
-              <select
-              id="req-reason"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              aria-invalid={attempted && !reason}
-              className={`${fieldBase} h-10 ${attempted && !reason ? 'border-danger' : 'border-line'}`}>
-              
-                <option value="">Select a reason</option>
-                {form.reasons.map((r) =>
-              <option key={r} value={r}>
-                    {r}
-                  </option>
-              )}
-              </select>
+              <GreenSelect id="req-reason" label="Reason" value={reason} onChange={setReason}
+                invalid={attempted && !reason} className="mt-1 h-10 w-full rounded-xl"
+                options={[{ value: '', label: 'Select a reason' }, ...form.reasons.map(r => ({ value: r, label: r }))]} />
               {attempted && !reason && <p className="mt-1 text-xs font-medium text-danger-ink">Choose a reason</p>}
             </div>
             <div>

@@ -3,6 +3,7 @@ import { addDays, format, parseISO } from 'date-fns';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useOrders } from '../../contexts/OrdersContext';
 import { TODAY } from '../../data/schedule';
+import { todayColombo } from '../../api/storeApi';
 import { Card } from '../ui/Card';
 
 interface VolumeDay {
@@ -14,12 +15,13 @@ interface VolumeDay {
 }
 
 export function DeliveryAnalytics() {
-  const { orders } = useOrders();
+  const { orders, live } = useOrders();
+  const today = live ? todayColombo() : TODAY;
   const reduce = useReducedMotion();
-  const [selectedDate, setSelectedDate] = useState(TODAY);
+  const [selectedDate, setSelectedDate] = useState(today);
 
   const days = useMemo<VolumeDay[]>(() => {
-    const start = addDays(parseISO(TODAY), -4);
+    const start = addDays(parseISO(today), -4);
     return Array.from({ length: 7 }, (_, index) => {
       const date = addDays(start, index);
       const iso = format(date, 'yyyy-MM-dd');
@@ -30,13 +32,14 @@ export function DeliveryAnalytics() {
         label: format(date, 'EEEEE'),
         fullDate: format(date, 'EEE, d MMM'),
         cases,
-        state: iso < TODAY ? 'received' : iso === TODAY ? 'today' : 'scheduled'
+        state: iso < today ? 'received' : iso === today ? 'today' : 'scheduled'
       };
     });
-  }, [orders]);
+  }, [orders, today]);
 
   const max = Math.max(1, ...days.map((day) => day.cases));
   const selected = days.find((day) => day.iso === selectedDate) ?? days[4];
+  const activeDate = selected.iso;
 
   return (
     <Card className="flex h-full flex-col p-4 md:p-6">
@@ -48,7 +51,7 @@ export function DeliveryAnalytics() {
       <ul className="mt-8 flex h-56 items-stretch justify-between gap-3 sm:gap-5" aria-label="Weekly delivery volume">
         {days.map((day, index) => {
           const height = day.cases === 0 ? 0 : Math.max(30, day.cases / max * 100);
-          const active = day.iso === selectedDate;
+          const active = day.iso === activeDate;
           const barClass =
           day.state === 'today' ?
           'bg-brand-mint' :

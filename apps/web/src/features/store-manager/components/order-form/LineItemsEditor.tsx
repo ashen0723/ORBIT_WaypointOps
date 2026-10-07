@@ -2,12 +2,13 @@ import { PlusIcon, Trash2Icon } from 'lucide-react';
 import type { CatalogItem, LineDraft, Unit } from '../../types/orders';
 import { Button } from '../ui/Button';
 import { createBlankLine, lineError } from '../../utils/lineDrafts';
+import { GreenSelect, type GreenSelectOption } from '../ui/GreenSelect';
+import { GreenAutocomplete } from '../ui/GreenAutocomplete';
 
 interface LineItemsEditorProps {
   lines: LineDraft[];
   onChange: (lines: LineDraft[]) => void;
   suggestions: CatalogItem[];
-  listId: string;
   showErrors: boolean;
 }
 
@@ -15,7 +16,7 @@ const UNITS: Unit[] = ['cases', 'units', 'crates'];
 const field =
 'h-10 w-full rounded-xl border bg-surface px-3 text-base text-ink placeholder:text-muted transition-colors duration-150 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-canvas disabled:text-muted lg:text-sm';
 
-export function LineItemsEditor({ lines, onChange, suggestions, listId, showErrors }: LineItemsEditorProps) {
+export function LineItemsEditor({ lines, onChange, suggestions, showErrors }: LineItemsEditorProps) {
   const update = (id: string, patch: Partial<LineDraft>) => onChange(lines.map((l) => l.id === id ? { ...l, ...patch } : l));
 
   const handleName = (line: LineDraft, name: string) => {
@@ -29,6 +30,12 @@ export function LineItemsEditor({ lines, onChange, suggestions, listId, showErro
   };
 
   const add = () => onChange([...lines, createBlankLine(suggestions[0]?.unit)]);
+  const itemNames = suggestions.map(item => item.name);
+  const availableUnits = [...new Set([...UNITS, ...suggestions.map(item => item.unit), ...lines.map(line => line.unit)])];
+  const unitOptions: GreenSelectOption<Unit>[] = availableUnits.map(unit => ({
+    value: unit,
+    label: unit[0].toUpperCase() + unit.slice(1),
+  }));
 
   return (
     <div>
@@ -51,13 +58,9 @@ export function LineItemsEditor({ lines, onChange, suggestions, listId, showErro
               <tr key={line.id} className="align-top">
                 <td className="py-3 pr-2 pt-5 tabular-nums text-subtle">{i + 1}</td>
                 <td className="py-3 pr-4">
-                  <input
-                    aria-label={`Item ${i + 1} name`}
-                    list={listId}
-                    value={line.name}
-                    onChange={(e) => handleName(line, e.target.value)}
-                    placeholder="Search or type an item"
-                    aria-invalid={Boolean(error)}
+                  <GreenAutocomplete label={`Item ${i + 1} name`} value={line.name}
+                    options={itemNames} onChange={name => handleName(line, name)}
+                    placeholder="Search or type an item" invalid={Boolean(error)}
                     className={`${field} ${error ? 'border-danger' : 'border-line'}`} />
                   
                   {error && <p className="mt-1 text-xs font-medium text-danger-ink">{error}</p>}
@@ -75,18 +78,9 @@ export function LineItemsEditor({ lines, onChange, suggestions, listId, showErro
                   
                 </td>
                 <td className="py-3 pr-4">
-                  <select
-                    aria-label={`Item ${i + 1} unit`}
-                    value={line.unit}
-                    onChange={(e) => update(line.id, { unit: e.target.value as Unit })}
-                    className={`${field} border-line`}>
-                    
-                    {[...new Set([...UNITS, ...suggestions.map(item => item.unit), line.unit])].map((u) =>
-                    <option key={u} value={u}>
-                        {u[0].toUpperCase() + u.slice(1)}
-                      </option>
-                    )}
-                  </select>
+                  <GreenSelect<Unit> label={`Item ${i + 1} unit`} value={line.unit} onChange={unit => update(line.id, { unit })}
+                    className="h-10 w-full rounded-xl"
+                    options={unitOptions} />
                 </td>
                 <td className="py-3">
                   <button
@@ -120,17 +114,14 @@ export function LineItemsEditor({ lines, onChange, suggestions, listId, showErro
                   <Trash2Icon className="h-5 w-5" />
                 </button>
               </div>
-              <label className="mt-2 block">
+              <div className="mt-2 block">
                 <span className="text-sm text-subtle">Item name</span>
-                <input
-                  list={listId}
-                  value={line.name}
-                  onChange={(e) => handleName(line, e.target.value)}
-                  placeholder="Search or type an item"
-                  aria-invalid={Boolean(error)}
-                  className={`${field} mt-1 border-line`} />
+                <GreenAutocomplete label={`Item ${i + 1} name`} value={line.name}
+                    options={itemNames} onChange={name => handleName(line, name)}
+                    placeholder="Search or type an item" invalid={Boolean(error)}
+                    className={`${field} ${error ? 'border-danger' : 'border-line'}`} />
                 
-              </label>
+              </div>
               <div className="mt-4 grid grid-cols-2 gap-4">
                 <label className="block">
                   <span className="text-sm text-subtle">Quantity</span>
@@ -144,32 +135,18 @@ export function LineItemsEditor({ lines, onChange, suggestions, listId, showErro
                     className={`${field} mt-1 border-line tabular-nums`} />
                   
                 </label>
-                <label className="block">
+                <div className="block">
                   <span className="text-sm text-subtle">Unit</span>
-                  <select
-                    value={line.unit}
-                    onChange={(e) => update(line.id, { unit: e.target.value as Unit })}
-                    className={`${field} mt-1 border-line`}>
-                    
-                    {[...new Set([...UNITS, ...suggestions.map(item => item.unit), line.unit])].map((u) =>
-                    <option key={u} value={u}>
-                        {u[0].toUpperCase() + u.slice(1)}
-                      </option>
-                    )}
-                  </select>
-                </label>
+                  <GreenSelect<Unit> label={`Item ${i + 1} unit`} value={line.unit} onChange={unit => update(line.id, { unit })}
+                    className="mt-1 h-10 w-full rounded-xl"
+                    options={unitOptions} />
+                </div>
               </div>
               {error && <p className="mt-2 text-sm font-medium text-danger-ink">{error}</p>}
             </li>);
 
         })}
       </ul>
-
-      <datalist id={listId}>
-        {suggestions.map((s) =>
-        <option key={s.name} value={s.name} />
-        )}
-      </datalist>
 
       <Button variant="outline" onClick={add} className="mt-4 w-full md:w-auto">
         <PlusIcon aria-hidden="true" className="h-4 w-4" />

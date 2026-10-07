@@ -5,6 +5,7 @@ import { buttonStyles } from '../ui/Button';
 import { useCutoffSeconds } from '../../contexts/CutoffContext';
 import { reminders, type ReminderPriority } from '../../data/reminders';
 import { splitCountdown } from '../../utils/time';
+import { useOrders } from '../../contexts/OrdersContext';
 
 const PRIORITY_STYLES: Record<ReminderPriority, {label: string;chip: string;dot: string;}> = {
   high: { label: 'High', chip: 'bg-danger-pale text-danger-ink', dot: 'bg-danger' },
@@ -13,19 +14,27 @@ const PRIORITY_STYLES: Record<ReminderPriority, {label: string;chip: string;dot:
 };
 
 export function CutoffReminder() {
+  const { live, store } = useOrders();
   const seconds = useCutoffSeconds();
   const { h, m } = splitCountdown(seconds);
   const past = seconds === 0;
+  const visibleReminders = live ? store?.nextDeliveryDate ? [{
+    id: 'next-delivery',
+    title: `${store.brand.charAt(0)}${store.brand.slice(1).toLowerCase()} order for ${new Date(`${store.nextDeliveryDate}T00:00:00Z`).toLocaleDateString('en-LK', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' })}`,
+    deadline: store.cutoffAt ? new Date(store.cutoffAt).toLocaleString('en-LK', { timeZone: 'Asia/Colombo', weekday: 'short', hour: 'numeric', minute: '2-digit' }) : 'Next order cutoff',
+    priority: 'high' as const,
+    usesTodayCutoff: Boolean(store.cutoffAt)
+  }] : [] : reminders;
 
   return (
     <Card className="flex h-full flex-col p-4 md:p-6">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-lg font-semibold text-ink">Reminders</h2>
-        <span className="text-sm text-subtle">{reminders.length} due</span>
+        <span className="text-sm text-subtle">{visibleReminders.length} due</span>
       </div>
 
       <ul className="mt-3 divide-y divide-line">
-        {reminders.map((r) => {
+        {visibleReminders.map((r) => {
           const p = PRIORITY_STYLES[r.priority];
           const closed = r.usesTodayCutoff && past;
           const urgent = r.usesTodayCutoff && !past && seconds < 3600;

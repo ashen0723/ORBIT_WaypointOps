@@ -64,7 +64,7 @@ export function OrderSummary(props: OrderSummaryProps) {
       </dl>
       {priorOrderId &&
       <p className="mt-2 rounded-lg bg-canvas px-3 py-2 text-xs text-subtle">
-          {priorOrderId} is already submitted for this day. This will go as a separate, additional order.
+          One order already submitted.
         </p>
       }
       <Button

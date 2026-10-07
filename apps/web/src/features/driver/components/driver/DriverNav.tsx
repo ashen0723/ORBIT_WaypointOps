@@ -1,3 +1,4 @@
+import { NavigationSectionLabel } from '../../../../components/shared/NavigationSectionLabel';
 import type { LucideIcon } from 'lucide-react';
 import { CircleUserRoundIcon, FlaskConicalIcon, LogOutIcon, MapPinnedIcon, RouteIcon, TriangleAlertIcon } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
@@ -45,9 +46,9 @@ export function DriverNav({ variant }: {variant: Variant;}) {
 
   return (
     <nav aria-label="Driver navigation">
-      <SectionLabel>Menu</SectionLabel>
+      <NavigationSectionLabel>Menu</NavigationSectionLabel>
       <ul className="mt-2 space-y-1 px-3">{MENU_ITEMS.map((item) => <SidebarLink key={item.to} item={item} pathname={location.pathname} />)}</ul>
-      <SectionLabel className="mt-8">General</SectionLabel>
+      <NavigationSectionLabel className="mt-8">General</NavigationSectionLabel>
       <ul className="mt-2 space-y-1 px-3">
         {GENERAL_ITEMS.map((item) => <SidebarLink key={item.to} item={item} pathname={location.pathname} />)}
         <li>
@@ -61,9 +62,7 @@ export function DriverNav({ variant }: {variant: Variant;}) {
 
 }
 
-function SectionLabel({ children, className = '' }: {children: string;className?: string;}) {
-  return <p className={`px-8 text-xs font-medium uppercase tracking-wide text-subtle ${className}`}>{children}</p>;
-}
+
 
 function isItemActive(item: NavItem, pathname: string, isActive: boolean) {
   return isActive || item.to === '/current-stop' && pathname.includes('/stops/');

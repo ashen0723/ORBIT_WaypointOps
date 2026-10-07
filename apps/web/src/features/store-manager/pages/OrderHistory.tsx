@@ -8,9 +8,9 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { OrdersTable } from '../components/orders/OrdersTable';
 import { OUTLET_NAME } from '../data/schedule';
 import { STATUS_CONFIG } from '../utils/status';
+import { GreenSelect } from '../components/ui/GreenSelect';
 
-const selectClass =
-'h-10 w-full rounded-full border border-line bg-surface px-4 text-base font-medium text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 sm:w-48 lg:text-sm';
+const selectClass = 'mt-1 h-10 w-full rounded-full sm:w-48';
 
 export function OrderHistory() {
   const { orders, store, live, loading, error } = useOrders();
@@ -36,26 +36,16 @@ export function OrderHistory() {
       {live && error && <p role="alert" className="mt-4 text-sm text-danger-ink">{error}</p>}
       
       <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-end">
-        <label className="block">
+        <div className="block">
           <span className="text-sm text-subtle">Status</span>
-          <select aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value as 'all' | OrderStatus)} className={`${selectClass} mt-1`}>
-            <option value="all">All statuses</option>
-            {(Object.keys(STATUS_CONFIG) as OrderStatus[]).map((s) =>
-            <option key={s} value={s}>
-                {STATUS_CONFIG[s].label}
-              </option>
-            )}
-          </select>
-        </label>
-        <label className="block">
+          <GreenSelect<'all' | OrderStatus> label="Status" value={status} onChange={setStatus} className={selectClass}
+            options={[{ value: 'all', label: 'All statuses' }, ...(Object.keys(STATUS_CONFIG) as OrderStatus[]).map(s => ({ value: s, label: STATUS_CONFIG[s].label }))]} />
+        </div>
+        <div className="block">
           <span className="text-sm text-subtle">Brand</span>
-          <select aria-label="Brand" value={brand} onChange={(e) => setBrand(e.target.value as 'all' | Brand)} className={`${selectClass} mt-1`}>
-            <option value="all">All brands</option>
-            <option value="Fresh">Fresh</option>
-            <option value="Style">Style</option>
-            <option value="Tech">Tech</option>
-          </select>
-        </label>
+          <GreenSelect<'all' | Brand> label="Brand" value={brand} onChange={setBrand} className={selectClass}
+            options={[{ value: 'all', label: 'All brands' }, { value: 'Fresh', label: 'Fresh' }, { value: 'Style', label: 'Style' }, { value: 'Tech', label: 'Tech' }]} />
+        </div>
         {query &&
         <span className="inline-flex h-10 items-center gap-2 self-start rounded-full bg-brand-pale pl-4 pr-1 text-sm text-forest sm:self-auto">
             Results for “{query}”

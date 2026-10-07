@@ -1,9 +1,8 @@
-import { CheckIcon, PackageIcon, SnowflakeIcon } from 'lucide-react';
+import { PackageIcon, SnowflakeIcon } from 'lucide-react';
 import type { OrderType } from '../../types/orders';
 
 interface TabInfo {
   drafted: number;
-  submittedId?: string;
 }
 
 interface FreshOrderTabsProps {
@@ -22,7 +21,7 @@ export function FreshOrderTabs({ value, onChange, info }: FreshOrderTabsProps) {
     <div role="tablist" aria-label="Delivery type" className="grid grid-cols-2 gap-2">
       {TABS.map(({ value: tab, label, Icon }) => {
         const selected = tab === value;
-        const { drafted, submittedId } = info[tab];
+        const { drafted } = info[tab];
         return (
           <button
             key={tab}
@@ -41,8 +40,7 @@ export function FreshOrderTabs({ value, onChange, info }: FreshOrderTabsProps) {
               {label}
             </span>
             <span className="mt-0.5 flex items-center gap-1 text-xs text-subtle">
-              {submittedId && <CheckIcon aria-hidden="true" className="h-3 w-3 text-brand-medium" />}
-              {submittedId ? `Sent · ${submittedId}` : drafted ? `${drafted} item${drafted === 1 ? '' : 's'} drafted` : 'Not started'}
+              {drafted ? `${drafted} item${drafted === 1 ? '' : 's'} drafted` : 'Not started'}
             </span>
           </button>);
 
