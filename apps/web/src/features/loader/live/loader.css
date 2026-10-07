@@ -39,12 +39,6 @@
   align-items: center;
   justify-content: space-between;
 }
-.loader-nav-label {
-  font-size: 12px;
-  text-transform: uppercase;
-  color: #5c615e;
-  margin: 12px 14px 8px;
-}
 .loader-sidebar nav a,
 .loader-sidebar nav button {
   position: relative;

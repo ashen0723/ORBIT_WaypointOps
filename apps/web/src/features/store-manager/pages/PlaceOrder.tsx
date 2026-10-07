@@ -15,21 +15,12 @@ import { LineItemsEditor } from '../components/order-form/LineItemsEditor';
 import { OrderSummary } from '../components/order-form/OrderSummary';
 import { nextDeliveryDateColombo } from '../api/storeApi';
 import { CUTOFF_MINUTES, NEXT_DELIVERY, OUTLET_NAME } from '../data/schedule';
+import { catalog as demoCatalog } from '../data/catalog';
 import { createBlankLine, isLineComplete, lineError } from '../utils/lineDrafts';
 import { estimateLoad } from '../utils/estimate';
 import { formatClock } from '../utils/time';
 import { formatDate } from '../utils/format';
 import { useScreenInit } from '../useScreenInit.js';
-
-const initialDrafts: Record<string, LineDraft[]> = {
-  'Fresh-dry': [
-  { id: 'seed-1', name: 'Sourdough loaf', qty: '6', unit: 'crates' },
-  { id: 'seed-2', name: 'Penne 500g', qty: '4', unit: 'cases' }],
-
-  'Fresh-chilled': [createBlankLine('cases')],
-  'Style-dry': [createBlankLine('cases')],
-  'Tech-dry': [createBlankLine('units')]
-};
 
 export function PlaceOrder() {
   const navigate = useNavigate();
@@ -41,13 +32,10 @@ export function PlaceOrder() {
   const initialFreshType = (['dry', 'chilled'] as OrderType[]).includes(screenInit.freshType ?? 'dry') ? (screenInit.freshType ?? 'dry') : 'dry';
   const [brand, setBrand] = useState<Brand>(initialBrand);
   const [freshType, setFreshType] = useState<OrderType>(initialFreshType);
-  const [drafts, setDrafts] = useState(live ? {} : initialDrafts);
+  const [drafts, setDrafts] = useState<Record<string, LineDraft[]>>({});
   const [showErrors, setShowErrors] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (live && catalog.length > 0 && !catalog.some(item => item.brand === brand)) setBrand(catalog[0].brand);
-  }, [live, catalog, brand]);
+  const outletBrand = store ? ({ FRESH: 'Fresh', STYLE: 'Style', TECH: 'Tech' } as const)[store.brand] : null;
 
   useEffect(() => { actionId.current = null; }, [brand, freshType, drafts]);
 
@@ -55,19 +43,21 @@ export function PlaceOrder() {
   const key = `${brand}-${type}`;
   const lines = drafts[key] ?? [{ id: `initial-${key}`, name: '', qty: '', unit: suggestionsUnit() }];
   function suggestionsUnit() { return catalog.find(c => c.brand === brand && c.type === type)?.unit ?? 'units'; }
-  const delivery = live ? { date: store?.nextDeliveryDate ?? nextDeliveryDateColombo(), note: 'Next eligible delivery run' } : NEXT_DELIVERY[brand];
-  const suggestions = catalog.filter((c) => c.brand === brand && c.type === type);
+  const delivery = live ? { date: store?.nextDeliveryDate ?? nextDeliveryDateColombo(), note: outletBrand && brand !== outletBrand ? 'Preview only · outlet schedule may differ' : 'Next eligible delivery run' } : NEXT_DELIVERY[brand];
+  const suggestions = (live && outletBrand && brand !== outletBrand ? demoCatalog : catalog).filter((c) => c.brand === brand && c.type === type);
   const valid = lines.filter(isLineComplete).map((l) => ({ name: l.name.trim(), qty: Number(l.qty), unit: l.unit }));
   const hasPartial = lines.some((l) => lineError(l) !== null);
   const load = live ? valid.reduce((sum, line) => { const item = suggestions.find(c => c.name === line.name && c.unit === line.unit); return { kg: sum.kg + (item?.kg ?? 0) * line.qty, m3: sum.m3 + (item?.m3 ?? 0) * line.qty }; }, { kg: 0, m3: 0 }) : estimateLoad(valid);
   const totalQty = valid.reduce((s, l) => s + l.qty, 0);
   const pastCutoff = live ? !store?.nextDeliveryDate : cutoffSeconds === 0;
+  const unsupportedBrand = live && outletBrand !== null && brand !== outletBrand;
 
   const findSubmitted = (b: Brand, t: OrderType) =>
   orders.find((o) => o.brand === b && o.type === t && o.requestedDate === (live ? delivery.date : NEXT_DELIVERY[b].date));
   const prior = findSubmitted(brand, type);
 
-  const helpText = live && (loading || catalog.length === 0) ? 'Loading your outlet catalogue…' :
+  const helpText = unsupportedBrand ? `This outlet can only submit ${outletBrand} orders. Your ${brand} draft stays here when you switch brands.` :
+  live && (loading || catalog.length === 0) ? 'Loading your outlet catalogue…' :
   live && error ? error : pastCutoff ?
   'No eligible delivery run is available. Please contact your dispatch team.' :
   valid.length === 0 ?
@@ -79,7 +69,7 @@ export function PlaceOrder() {
   const setLines = (next: LineDraft[]) => setDrafts((prev) => ({ ...prev, [key]: next }));
 
   const handleSubmit = async () => {
-    if (pastCutoff || submitting || (live && (loading || catalog.length === 0))) return;
+    if (pastCutoff || unsupportedBrand || submitting || (live && (loading || catalog.length === 0))) return;
     if (valid.length === 0 || hasPartial) {
       setShowErrors(true);
       return;
@@ -131,7 +121,7 @@ export function PlaceOrder() {
                       setShowErrors(false);
                     }}
                     selectedClassName="bg-forest text-white shadow-card hover:bg-brand"
-                    options={(live ? [...new Set(catalog.map(item => item.brand))] : ['Fresh', 'Style', 'Tech'] as Brand[]).map((b) => ({
+                    options={(['Fresh', 'Style', 'Tech'] as Brand[]).map((b) => ({
                       value: b,
                       label: b
                     }))} />
@@ -140,6 +130,7 @@ export function PlaceOrder() {
                 <p className="mt-2 text-sm text-subtle">
                   {delivery.note} · next delivery {formatDate(delivery.date)}
                 </p>
+                {unsupportedBrand && <p className="mt-1 text-xs text-subtle">This brand is available to draft; this outlet submits {outletBrand} orders.</p>}
               </div>
               <div>
                 <h2 className="text-sm font-semibold text-ink">Delivery type</h2>
@@ -152,8 +143,8 @@ export function PlaceOrder() {
                       setShowErrors(false);
                     }}
                     info={{
-                      dry: { drafted: countDrafted('dry'), submittedId: findSubmitted('Fresh', 'dry')?.id },
-                      chilled: { drafted: countDrafted('chilled'), submittedId: findSubmitted('Fresh', 'chilled')?.id }
+                      dry: { drafted: countDrafted('dry') },
+                      chilled: { drafted: countDrafted('chilled') }
                     }} /> :
 
 
@@ -195,7 +186,6 @@ export function PlaceOrder() {
               lines={lines}
               onChange={setLines}
               suggestions={suggestions}
-              listId={`catalog-${key}`}
               showErrors={showErrors} />
             
           </Card>
@@ -212,7 +202,7 @@ export function PlaceOrder() {
           deliveryNote={delivery.note}
           priorOrderId={prior?.id}
           helpText={helpText}
-          pastCutoff={pastCutoff || (live && (loading || catalog.length === 0))}
+          pastCutoff={pastCutoff || unsupportedBrand || (live && (loading || catalog.length === 0))}
           submitting={submitting}
           onSubmit={handleSubmit} />
         

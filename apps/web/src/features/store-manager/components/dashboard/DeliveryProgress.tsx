@@ -1,13 +1,18 @@
 import { Card } from '../ui/Card';
 import { useOrders } from '../../contexts/OrdersContext';
 import { WEEK_START } from '../../data/schedule';
+import { todayColombo } from '../../api/storeApi';
 
 const ARC_PATH = 'M30 122 A90 90 0 0 1 210 122';
 const GAP = 1.5;
 
 export function DeliveryProgress() {
-  const { orders } = useOrders();
-  const weekOrders = orders.filter((order) => order.requestedDate >= WEEK_START);
+  const { orders, live } = useOrders();
+  const today = live ? todayColombo() : null;
+  const weekStart = today ? new Date(`${today}T00:00:00Z`) : null;
+  if (weekStart) weekStart.setUTCDate(weekStart.getUTCDate() - (weekStart.getUTCDay() + 6) % 7);
+  const start = weekStart ? weekStart.toISOString().slice(0, 10) : WEEK_START;
+  const weekOrders = orders.filter((order) => order.requestedDate >= start && (!today || order.requestedDate <= today));
   const total = Math.max(1, weekOrders.length);
   const completed = weekOrders.filter((order) => order.status === 'delivered' || order.status === 'receipt_confirmed').length;
   const inProgress = weekOrders.filter((order) => ['confirmed', 'planned', 'loading', 'in_transit'].includes(order.status)).length;

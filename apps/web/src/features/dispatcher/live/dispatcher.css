@@ -555,8 +555,6 @@
 .dispatcher-live { gap: 20px; padding: 16px; background: #fff; color: #111; font-size: 15px; line-height: 1.5; align-items: flex-start; }
 .dispatch-sidebar { top: 16px; width: 264px; height: calc(100vh - 32px); padding: 24px 16px; border: 0; border-radius: 28px; background: #eef0ed; overflow-y: auto; }
 .dispatch-brand { padding: 0 8px 28px; letter-spacing: -.035em; font-size: 23px; font-weight: 650; color: #111; }
-.dispatch-brand-image { position:relative; display:grid; place-items:center; width:40px; height:40px; flex-shrink:0; overflow:hidden; background:#fff; }
-.dispatch-brand-image img { position:absolute; width:250%; height:250%; max-width:none; object-fit:contain; }
 .dispatch-brand small { font-size: 13px; color: #205438; font-weight: 600; }
 .dispatch-sidebar nav,.dispatch-drawer nav { display: grid; gap: 4px; }
 .dispatch-sidebar nav a,.dispatch-drawer nav a { position: relative; display:flex; align-items:center; gap:12px; min-height:46px; padding:10px 8px; color:#5c615e; border-radius:24px; font-weight:500; }

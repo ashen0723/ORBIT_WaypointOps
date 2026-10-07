@@ -1,3 +1,4 @@
+import { NavigationSectionLabel } from '../../../components/shared/NavigationSectionLabel';
 import { useState, type ReactNode } from "react";
 import { Link, NavLink } from "react-router-dom";
 import {
@@ -67,10 +68,10 @@ export function LoaderShell({
           </button>
         </div>
         <nav aria-label="Loader navigation">
-          <p className="loader-nav-label">Menu</p>
+          <NavigationSectionLabel className="mb-2 mt-3">Menu</NavigationSectionLabel>
           {navigation.map(({ to, label, accessible, icon: Icon }, i) => (
             <div key={to}>
-              {i === 3 && <p className="loader-nav-label">General</p>}
+              {i === 3 && <NavigationSectionLabel className="mb-2 mt-3">General</NavigationSectionLabel>}
               <NavLink
                 end={to === "/"}
                 to={to}

@@ -1,3 +1,4 @@
+import { NavigationSectionLabel } from '../../../../components/shared/NavigationSectionLabel';
 import { useAuth } from '../../../../app/providers/AuthProvider';
 import { useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
@@ -83,7 +84,7 @@ export function MobileDrawer({ open, onClose, onSignOut }: MobileDrawerProps) {
               </p>
             </div>
             <nav aria-label="Main" className="mt-6 px-3">
-              <p className="px-4 text-xs font-medium uppercase tracking-wide text-subtle">Menu</p>
+              <NavigationSectionLabel variant="drawer">Menu</NavigationSectionLabel>
               <div className="mt-2 flex flex-col gap-1">
                 {menuNav.map(({ to, label, icon: Icon, end }) =>
               <NavLink key={to} to={to} end={end} onClick={onClose} className={linkClass}>
@@ -92,7 +93,7 @@ export function MobileDrawer({ open, onClose, onSignOut }: MobileDrawerProps) {
                   </NavLink>
               )}
               </div>
-              <p className="mt-6 px-4 text-xs font-medium uppercase tracking-wide text-subtle">General</p>
+              <NavigationSectionLabel variant="drawer" className="mt-6">General</NavigationSectionLabel>
               <div className="mt-2 flex flex-col gap-1">
                 {generalNav.map(({ to, label, icon: Icon, end }) =>
               <NavLink key={to} to={to} end={end} onClick={onClose} className={linkClass}>

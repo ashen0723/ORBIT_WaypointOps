@@ -8,6 +8,7 @@ import { BrandTag } from './BrandTag';
 import { ChilledTag } from './ChilledTag';
 import { formatDate } from '../../utils/format';
 import { arrivalLabel, arrivalSortValue, orderAction, statusRank } from '../../utils/orders';
+import { GreenSelect } from '../ui/GreenSelect';
 
 type SortKey = 'id' | 'brand' | 'requestedDate' | 'status' | 'arrival';
 type SortDir = 'asc' | 'desc';
@@ -133,26 +134,19 @@ export function OrdersTable({ orders, label, defaultSort = { key: 'requestedDate
       </Card>
 
       <div className="lg:hidden">
-        <label className="mb-4 flex items-center justify-end gap-2 text-sm">
+        <div className="mb-4 flex items-center justify-end gap-2 text-sm">
           <span className="text-subtle">Sort by</span>
-          <select
-            value={`${sort.key}:${sort.dir}`}
-            onChange={(e) => {
-              const [key, dir] = e.target.value.split(':');
+          <GreenSelect label="Sort by" value={`${sort.key}:${sort.dir}`}
+            onChange={(value) => {
+              const [key, dir] = value.split(':');
               setSort({ key: key as SortKey, dir: dir as SortDir });
             }}
-            className="h-10 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink focus:outline-none focus:ring-2 focus:ring-brand">
-            
-            {COLUMNS.flatMap((col) => [
-            <option key={`${col.key}-asc`} value={`${col.key}:asc`}>
-                {col.label} ↑
-              </option>,
-            <option key={`${col.key}-desc`} value={`${col.key}:desc`}>
-                {col.label} ↓
-              </option>]
-            )}
-          </select>
-        </label>
+            className="h-10 min-w-40 rounded-xl"
+            options={COLUMNS.flatMap(col => [
+              { value: `${col.key}:asc`, label: `${col.label} ↑` },
+              { value: `${col.key}:desc`, label: `${col.label} ↓` }
+            ])} />
+        </div>
         <ul className="grid gap-4 md:grid-cols-2" aria-label={label}>
           {sorted.map((order) => {
             const action = orderAction(order);
